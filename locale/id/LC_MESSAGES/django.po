@@ -152,3 +152,15 @@ msgstr "Selamat, Anda lulus! Bayar untuk klaim sertifikat."
 
 msgid "Claim Certificate"
 msgstr "Klaim Sertifikat"
+
+msgid "Congratulations, you passed!"
+msgstr "Selamat, Anda lulus!"
+
+msgid "Claim your certificate by completing the payment."
+msgstr "Klaim sertifikat Anda dengan menyelesaikan pembayaran."
+
+msgid "Maybe later"
+msgstr "Nanti saja"
+
+msgid "Close"
+msgstr "Tutup"
