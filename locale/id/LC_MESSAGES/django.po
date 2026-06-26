@@ -1,0 +1,145 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: custom-theme 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-06-26 00:00+0000\n"
+"PO-Revision-Date: 2026-06-26 00:00+0000\n"
+"Language: id\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+msgid "Dashboard"
+msgstr "Dasbor"
+
+msgid "Good morning"
+msgstr "Selamat pagi"
+
+msgid "Good afternoon"
+msgstr "Selamat siang"
+
+msgid "Good evening"
+msgstr "Selamat sore"
+
+msgid "Good night"
+msgstr "Selamat malam"
+
+msgid "Learner navigation"
+msgstr "Navigasi pembelajar"
+
+msgid "Learning Portal"
+msgstr "Portal Belajar"
+
+msgid "Dashboard sections"
+msgstr "Bagian dasbor"
+
+msgid "Discover"
+msgstr "Jelajahi"
+
+msgid "Certificate notifications"
+msgstr "Notifikasi sertifikat"
+
+msgid "Verification"
+msgstr "Verifikasi"
+
+msgid "Verification notifications"
+msgstr "Notifikasi verifikasi"
+
+msgid "You Have"
+msgstr "Anda Memiliki"
+
+msgid "See Progress"
+msgstr "Lihat Progres"
+
+msgid "Enrolled courses"
+msgstr "Kursus terdaftar"
+
+msgid "Certificates ready"
+msgstr "Sertifikat siap"
+
+msgid "Program entitlements"
+msgstr "Hak program"
+
+msgid "Load all courses"
+msgstr "Muat semua kursus"
+
+msgid "Course schedule"
+msgstr "Jadwal kursus"
+
+msgid "Ended"
+msgstr "Berakhir"
+
+msgid "Ends"
+msgstr "Berakhir"
+
+msgid "No scheduled dates"
+msgstr "Tidak ada tanggal terjadwal"
+
+msgid "Upcoming course starts"
+msgstr "Kursus akan dimulai"
+
+msgid "No upcoming course start dates are available."
+msgstr "Belum ada tanggal mulai kursus yang akan datang."
+
+msgid "Continue learning"
+msgstr "Lanjutkan belajar"
+
+msgid "See courses"
+msgstr "Lihat kursus"
+
+msgid "Resume"
+msgstr "Lanjutkan"
+
+msgid "Start course"
+msgstr "Mulai kursus"
+
+msgid "You have no courses to continue yet."
+msgstr "Belum ada kursus untuk dilanjutkan."
+
+msgid "Learning status"
+msgstr "Status belajar"
+
+msgid "Not started"
+msgstr "Belum dimulai"
+
+msgid "In progress"
+msgstr "Sedang berjalan"
+
+msgid "Certificate ready"
+msgstr "Sertifikat siap"
+
+msgid "Enrolled: {date}"
+msgstr "Terdaftar: {date}"
+
+msgid "Download Certificate"
+msgstr "Unduh Sertifikat"
+
+msgid "Open course"
+msgstr "Buka kursus"
+
+msgid ""
+"You are enrolled by your institution and should contact your institution to "
+"drop this course."
+msgstr ""
+"Anda didaftarkan oleh institusi Anda; hubungi institusi untuk membatalkan "
+"kursus ini."
+
+msgid "See all"
+msgstr "Lihat semua"
+
+msgid "Program connected to your enrolled course."
+msgstr "Program terkait dengan kursus yang Anda ikuti."
+
+msgid "Program"
+msgstr "Program"
+
+msgid "View course"
+msgstr "Lihat kursus"
+
+msgid "Active"
+msgstr "Aktif"
+
+msgid "No related program data is available for your current enrollments."
+msgstr "Tidak ada data program terkait untuk pendaftaran Anda saat ini."

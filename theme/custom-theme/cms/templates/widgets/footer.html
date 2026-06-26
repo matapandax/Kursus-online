@@ -1,0 +1,269 @@
+## mako
+<%page expression_filter="h"/>
+<%!
+from django.utils.translation import gettext as _
+from django.urls import reverse
+from datetime import datetime
+from django.conf import settings
+import pytz
+from cms.djangoapps.contentstore.config.waffle import ENABLE_ACCESSIBILITY_POLICY_PAGE
+from openedx.core.djangolib.markup import HTML, Text
+from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
+%>
+<%
+  blend_brand = configuration_helpers.get_value('PRIMARY_COLOR', getattr(settings, 'BRAND_PRIMARY_COLOR', '#2563eb'))
+  blend_brand_dark = configuration_helpers.get_value('PRIMARY_COLOR_DARK', getattr(settings, 'BRAND_PRIMARY_COLOR_DARK', '#1d4ed8'))
+%>
+
+<div class="wrapper-footer wrapper">
+  <footer class="primary" role="contentinfo">
+
+    <div class="footer-content-primary">
+      <div class="colophon">
+        <p>&copy; ${datetime.now(pytz.timezone(settings.TIME_ZONE)).year} <a href="${marketing_link('ROOT')}" rel="external">${settings.PLATFORM_NAME}</a>.</p>
+      </div>
+
+        <nav class="nav-peripheral" aria-label="${_("Policies")}">
+          <ol>
+            % if is_marketing_link_set('TOS'):
+              <li class="nav-item nav-peripheral-tos">
+                <a href="${marketing_link('TOS')}">${_("Terms of Service")}</a>
+              </li>
+            % endif
+            % if is_marketing_link_set('PRIVACY'):
+              <li class="nav-item nav-peripheral-pp">
+                <a href="${marketing_link('PRIVACY')}">${_("Privacy Policy")}</a>
+              </li>
+            % endif
+            % if ENABLE_ACCESSIBILITY_POLICY_PAGE.is_enabled():
+              <li class="nav-item nav-peripheral-aar">
+                <a href="${reverse('accessibility')}">${_("Accessibility Accommodation Request")}</a>
+              </li>
+            %endif
+            <li class="nav-item">
+              <a id="lms-link" href="${settings.LMS_ROOT_URL}">${_("LMS")}</a>
+            </li>
+          </ol>
+        </nav>
+    </div>
+
+    <div class="footer-content-secondary" aria-label="${_("Legal")}">
+      <div class="footer-about-copyright">
+        ## Site operators: Please do not remove this paragraph! This attributes back to edX and makes your acknowledgement of edX's trademarks clear.
+        <p>
+          ## Translators: 'edX' and 'Open edX' are trademarks of 'edX Inc.'. Please do not translate any of these trademarks and company names.
+          ${Text(_("edX, Open edX, and the edX and Open edX logos are registered trademarks of {link_start}edX Inc.{link_end}")).format(
+            link_start=HTML(u"<a href='https://www.edx.org/'>"),
+            link_end=HTML(u"</a>")
+          )}
+        </p>
+      </div>
+
+      <div class="footer-about-openedx">
+        <a href="https://open.edx.org" title="${_("Powered by Open edX")}">
+          <img alt="${_("Powered by Open edX")}" src="https://logos.openedx.org/open-edx-logo-tag.png">
+        </a>
+      </div>
+    </div>
+  </footer>
+</div>
+
+## ------------------------------------------------------------------
+## KUSTOM THEME: Editor TinyMCE (kaya fitur) untuk field "Course Overview"
+## di halaman Settings > Schedule & Details. Aktif hanya bila #course-overview ada.
+## Tidak mengubah file inti; menulis balik ke <textarea> + memicu 'change'
+## agar model Backbone tersimpan saat Save.
+## ------------------------------------------------------------------
+<script>
+(function () {
+  var TINYMCE_SRC = "/static/studio/js/vendor/tinymce/js/tinymce/tinymce.min.js";
+  var FIELDS = ["course-overview", "course-about-sidebar-html"];
+
+  function loadTinyMCE(cb) {
+    if (window.tinymce) { cb(); return; }
+    var s = document.createElement("script");
+    s.src = TINYMCE_SRC;
+    s.onload = cb;
+    s.onerror = function () { /* TinyMCE gagal dimuat; biarkan editor default */ };
+    document.head.appendChild(s);
+  }
+
+  function findCodeMirror(ta) {
+    var n = ta.nextElementSibling;
+    while (n) {
+      if (n.className && /(^|\s)CodeMirror(\s|$)/.test(n.className)) return n;
+      n = n.nextElementSibling;
+    }
+    return null;
+  }
+
+  function initOn(id) {
+    var ta = document.getElementById(id);
+    if (!ta) return false;
+    if (ta.getAttribute("data-tinymce-done")) return true;
+    var cmEl = findCodeMirror(ta);
+    // Butuh CodeMirror siap: itu jalur resmi update model + munculkan bar Save.
+    if (!cmEl || !cmEl.CodeMirror) return false;
+    var cm = cmEl.CodeMirror;
+    ta.setAttribute("data-tinymce-done", "1");
+    // Sembunyikan CodeMirror (tetap dipakai sebagai jembatan ke model Backbone).
+    cmEl.style.display = "none";
+    // Host khusus untuk TinyMCE.
+    var host = document.createElement("textarea");
+    host.className = "blend-tinymce-host";
+    host.value = cm.getValue();
+    cmEl.parentNode.insertBefore(host, cmEl.nextSibling);
+    window.tinymce.init({
+      target: host,
+      menubar: "edit insert view format table",
+      plugins: "advlist lists link image media table code codesample hr searchreplace wordcount fullscreen preview autolink charmap visualblocks",
+      toolbar: "undo redo | formatselect | bold italic underline forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image media table | removeformat | code preview fullscreen",
+      height: 480,
+      branding: false,
+      convert_urls: false,
+      setup: function (ed) {
+        ed.on("init", function () { if (host.value) ed.setContent(host.value); });
+        ed.on("change keyup undo redo SetContent", function () {
+          ed.save();                 // tulis konten TinyMCE ke host
+          cm.setValue(host.value);   // -> handler CodeMirror -> model -> bar Save muncul
+        });
+      }
+    });
+    return true;
+  }
+
+  function run() {
+    // hanya jalan di halaman yang punya salah satu field tsb
+    var present = FIELDS.filter(function (id) { return document.getElementById(id); });
+    if (!present.length) return;
+    loadTinyMCE(function () {
+      if (!window.tinymce) return;
+      var tries = 0;
+      var timer = setInterval(function () {
+        tries++;
+        var pending = present.filter(function (id) {
+          var ta = document.getElementById(id);
+          return ta && !ta.getAttribute("data-tinymce-done");
+        });
+        if (!pending.length) { clearInterval(timer); return; }
+        pending.forEach(function (id) { initOn(id); });
+        if (tries > 60) clearInterval(timer); // ~12s menunggu CodeMirror siap
+      }, 200);
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", run);
+  } else {
+    run();
+  }
+})();
+</script>
+
+## ------------------------------------------------------------------
+## KUSTOM THEME: rombak tampilan halaman Certificates (Studio).
+## Scoped ke body.view-certificates -> tidak memengaruhi halaman lain.
+## Warna brand mengikuti PRIMARY_COLOR (tidak hardcode).
+## ------------------------------------------------------------------
+<style>
+  body.view-certificates { background: #f3f6fb; }
+  .view-certificates .wrapper-content.wrapper { background: transparent; }
+  .view-certificates .mast .page-header,
+  .view-certificates .page-header { color: #0f172a; font-weight: 800; letter-spacing: -.01em; }
+
+  /* Kartu sertifikat */
+  .view-certificates .wrapper-certificate.collection-details,
+  .view-certificates .certificates-list .wrapper-certificate {
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(16,24,40,.04); margin-bottom: 18px; overflow: hidden;
+  }
+  .view-certificates .collection-header {
+    padding: 16px 20px; border-bottom: 1px solid #eef2f7; background: #f9fafb;
+  }
+  .view-certificates .collection-header h3,
+  .view-certificates .collection-header .title { color: #0f172a; font-weight: 800; }
+  .view-certificates .certificate-info { padding: 18px 20px; }
+  .view-certificates .certificate-label {
+    color: #667085; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+  }
+  .view-certificates .certificate-value { color: #111827; font-weight: 600; }
+  .view-certificates .actions.certificate-actions,
+  .view-certificates .certificate-edit-form .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  /* Tombol */
+  .view-certificates .action-primary,
+  .view-certificates button.action-primary,
+  .view-certificates .new-button,
+  .view-certificates .action-add,
+  .view-certificates .action-add-signatory {
+    background: ${blend_brand} !important; border: 1px solid ${blend_brand} !important;
+    color: #fff !important; border-radius: 8px !important; box-shadow: 0 1px 2px rgba(16,24,40,.08) !important;
+    text-shadow: none !important; font-weight: 700 !important;
+  }
+  .view-certificates .action-primary:hover,
+  .view-certificates button.action-primary:hover,
+  .view-certificates .new-button:hover,
+  .view-certificates .action-add:hover,
+  .view-certificates .action-add-signatory:hover {
+    background: ${blend_brand_dark} !important; border-color: ${blend_brand_dark} !important;
+  }
+  .view-certificates .action-secondary,
+  .view-certificates .action-cancel,
+  .view-certificates .button.external-help-button {
+    background: #fff !important; border: 1px solid #d1d5db !important; color: #344054 !important;
+    border-radius: 8px !important; text-shadow: none !important; box-shadow: none !important; font-weight: 700 !important;
+  }
+  .view-certificates .action-secondary:hover,
+  .view-certificates .button.external-help-button:hover { border-color: ${blend_brand} !important; color: ${blend_brand_dark} !important; }
+  .view-certificates .action-icon.delete,
+  .view-certificates .wrapper-delete-button { color: #b42318; }
+
+  /* Form editor */
+  .view-certificates .certificate-edit-form.collection-edit-form,
+  .view-certificates .signatory-edit-list {
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+    padding: 20px; box-shadow: 0 1px 2px rgba(16,24,40,.04);
+  }
+  .view-certificates .input-text,
+  .view-certificates input[type="text"].input-text,
+  .view-certificates textarea.input-text {
+    border: 1px solid #d1d5db !important; border-radius: 8px !important; padding: 10px 12px !important;
+    box-shadow: none !important; background: #fff !important;
+  }
+  .view-certificates .input-text:focus {
+    border-color: ${blend_brand} !important; box-shadow: 0 0 0 3px rgba(37,99,235,.15) !important; outline: none !important;
+  }
+  .view-certificates .tip, .view-certificates .instructions { color: #667085; }
+
+  /* Panel signatory */
+  .view-certificates .signatory-panel-body,
+  .view-certificates .signatory-fields,
+  .view-certificates .signatory-details-list .signatory-panel-default {
+    border: 1px solid #eef2f7; border-radius: 10px; padding: 14px; background: #f9fafb; margin-top: 10px;
+  }
+  .view-certificates .signatory-panel-header { font-weight: 800; color: #0f172a; }
+  .view-certificates .signatory-name-label,
+  .view-certificates .signatory-title-label,
+  .view-certificates .signatory-organization-label {
+    color: #667085; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
+  }
+  .view-certificates .signatory-name-value,
+  .view-certificates .signatory-title-value,
+  .view-certificates .signatory-organization-value { color: #111827; font-weight: 600; }
+  .view-certificates .signature-image, .view-certificates .signatory-image img { max-width: 100%; border-radius: 6px; }
+
+  /* Sidebar bantuan & nav */
+  .view-certificates .certificates-doc {
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 18px;
+    box-shadow: 0 1px 2px rgba(16,24,40,.04);
+  }
+  .view-certificates .certificates-doc .title-3 { color: #0f172a; font-weight: 800; }
+  .view-certificates .nav-related .nav-item a { color: ${blend_brand_dark}; font-weight: 600; }
+
+  /* State kosong & loading */
+  .view-certificates .no-content,
+  .view-certificates .notice-moduledisabled {
+    background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 12px; padding: 24px; color: #475467;
+  }
+  .view-certificates .ui-loading { color: #667085; }
+</style>

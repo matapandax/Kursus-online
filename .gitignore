@@ -1,0 +1,11 @@
+# Backup & temp
+*.bak
+*.bak-*
+_backups/
+*~
+*.orig
+# Jangan pernah commit konfigurasi berisi rahasia
+*.yml
+*.yaml
+secrets*
+*.key

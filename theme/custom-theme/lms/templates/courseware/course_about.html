@@ -1,0 +1,358 @@
+<%page expression_filter="h"/>
+<%namespace name='static' file='../static_content.html'/>
+<%!
+from django.utils.translation import gettext as _
+from django.utils.translation import pgettext
+from django.urls import reverse
+from lms.djangoapps.courseware.courses import get_course_about_section
+from django.conf import settings
+from common.djangoapps.edxmako.shortcuts import marketing_link
+from openedx.core.djangolib.js_utils import js_escaped_string
+from openedx.core.djangolib.markup import clean_dangerous_html, HTML, Text
+from openedx.core.lib.courses import course_image_url
+from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
+from common.djangoapps.student.models import CourseEnrollment
+from lxml.html.clean import Cleaner
+
+def loose_clean(html):
+    """Sanitizer lebih longgar utk overview (konten staf kursus):
+    pertahankan style/inline-style, atribut/class, iframe/embed/form & tabel;
+    tetap blokir <script> dan URL javascript: demi keamanan."""
+    if not html:
+        return html
+    cleaner = Cleaner(
+        style=False, inline_style=False, safe_attrs_only=False,
+        embedded=False, frames=False, forms=False,
+    )
+    return HTML(cleaner.clean_html(html))
+%>
+
+<%inherit file="../main.html" />
+<%block name="headextra">
+  <meta property="og:title" content="${course.display_name_with_default}" />
+  <meta property="og:description" content="${get_course_about_section(request, course, 'short_description')}" />
+</%block>
+
+<%block name="js_extra">
+  <script type="text/javascript">
+  (function() {
+    $(".register").click(function(event) {
+      $("#class_enroll_form").submit();
+      event.preventDefault();
+    });
+
+    $('#class_enroll_form').on('ajax:complete', function(event, xhr) {
+      if (xhr.status == 200) {
+        if (xhr.responseText == "") {
+          location.href = "${reverse('dashboard') | n, js_escaped_string}";
+        }
+        else {
+          location.href = xhr.responseText;
+        }
+      } else if (xhr.status == 403) {
+        location.replace("${reverse('signin_user') | n, js_escaped_string}?next=" + encodeURIComponent("${request.path | n, js_escaped_string}"));
+      } else {
+        $('#register_error').text(
+            (xhr.responseText ? xhr.responseText : "${_("An error occurred. Please try again later.") | n, js_escaped_string}")
+        ).css("display", "block");
+      }
+    });
+  })(this)
+  </script>
+  <script src="${static.url('js/course_info.js')}"></script>
+</%block>
+
+<%block name="pagetitle">${course.display_name_with_default}</%block>
+
+<%
+  brand_primary = configuration_helpers.get_value('PRIMARY_COLOR', getattr(settings, 'BRAND_PRIMARY_COLOR', '#2563eb'))
+  brand_primary_dark = configuration_helpers.get_value('PRIMARY_COLOR_DARK', getattr(settings, 'BRAND_PRIMARY_COLOR_DARK', '#1d4ed8'))
+  short_desc = get_course_about_section(request, course, 'short_description')
+  has_video = get_course_about_section(request, course, 'video')
+  effort = get_course_about_section(request, course, 'effort')
+
+  start_dt = course.advertised_start or course.start
+  if isinstance(start_dt, str):
+      start_label = start_dt
+  elif start_dt:
+      start_label = start_dt.strftime('%Y-%m-%d')
+  else:
+      start_label = ''
+  end_label = course.end.strftime('%Y-%m-%d') if course.end else ''
+  if start_label and end_label:
+      date_range_label = "%s  ~  %s" % (start_label, end_label)
+  else:
+      date_range_label = start_label or end_label
+
+  try:
+      enroll_count = CourseEnrollment.objects.filter(course_id=course.id, is_active=True).count()
+  except Exception:
+      enroll_count = 0
+%>
+
+<style>
+  .blend-about { --ba-blue: ${brand_primary}; --ba-blue-dark: ${brand_primary_dark}; color: #0f172a; background: #fff; font-family: Inter, "Helvetica Neue", Arial, sans-serif; }
+
+  .blend-about-hero { position: relative; display: flex; min-height: 440px; background-size: cover; background-position: center; color: #fff; }
+  .blend-about-hero::before { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(15,23,42,.92) 0%, rgba(15,23,42,.68) 55%, rgba(15,23,42,.46) 100%); }
+  .blend-about-hero-inner { position: relative; z-index: 1; width: 100%; max-width: 1180px; margin: 0 auto; padding: 44px 28px; display: flex; justify-content: space-between; gap: 30px; }
+  .blend-about-hero-left { display: flex; flex-direction: column; max-width: 680px; }
+  .blend-about-hero h1 { margin: 0 0 12px; color: #fff; font-size: 40px; line-height: 1.1; font-weight: 800; letter-spacing: -.01em; text-shadow: 0 2px 14px rgba(2,6,23,.55); }
+  .blend-about-offered { margin: 0 0 12px; color: #f1f5f9; font-size: 14px; font-weight: 600; text-shadow: 0 1px 8px rgba(2,6,23,.6); }
+  .blend-about-sub { margin: 0 0 26px; max-width: 620px; color: #fff; font-size: 16px; line-height: 1.6; font-weight: 500; text-shadow: 0 1px 10px rgba(2,6,23,.7); }
+  .blend-about-session { display: inline-flex; align-items: center; justify-content: space-between; gap: 14px; align-self: flex-start; min-width: 240px; padding: 13px 18px; border: 1px solid rgba(255,255,255,.5); border-radius: 10px; background: rgba(255,255,255,.06); font-size: 15px; font-weight: 700; }
+  .blend-about-session .fa { color: #cbd5e1; }
+  .blend-about-daterange { margin: 14px 0 0; color: #e2e8f0; font-size: 14px; font-weight: 600; }
+  .blend-about-enrolled { margin: 18px 0 0; color: #cbd5e1; font-size: 14px; font-weight: 600; }
+  .blend-about-hero-right { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; gap: 20px; }
+  .blend-about-orgbadge { max-width: 320px; padding: 10px 16px; border: 1px solid rgba(255,255,255,.35); border-radius: 10px; background: rgba(255,255,255,.08); color: #fff; font-size: 14px; font-weight: 700; text-align: right; }
+  .blend-about-join { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+  .blend-join-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 240px; min-height: 56px; padding: 16px 30px; border-radius: 12px; background: #fff; color: #0f172a; font-size: 17px; font-weight: 800; text-decoration: none; box-shadow: 0 14px 30px rgba(2,6,23,.35); cursor: pointer; transition: transform .12s ease, color .15s ease; }
+  .blend-join-btn:hover { color: var(--ba-blue-dark); text-decoration: none; transform: translateY(-2px); }
+  .blend-join-btn.is-disabled { background: rgba(255,255,255,.18); color: #e2e8f0; box-shadow: none; cursor: not-allowed; }
+  .blend-join-btn.is-disabled:hover { transform: none; color: #e2e8f0; }
+  .blend-join-enrolled { color: #86efac; font-size: 14px; font-weight: 700; text-align: right; }
+  #register_error { color: #fecaca; font-size: 13px; }
+
+  .blend-about-body { max-width: 1180px; margin: 0 auto; padding: 48px 28px 72px; display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 40px; align-items: start; background: #fff; }
+  .blend-about-section-title { margin: 0 0 20px; color: #0f172a; font-size: 30px; font-weight: 800; letter-spacing: -.01em; }
+  .blend-about-studio { display: inline-block; margin-bottom: 16px; padding: 8px 14px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: #475467; font-size: 13px; font-weight: 700; text-decoration: none; }
+  .blend-about-overview { color: #334155; font-size: 16px; line-height: 1.75; }
+  .blend-about-overview h1, .blend-about-overview h2, .blend-about-overview h3 { color: #0f172a; line-height: 1.3; }
+  .blend-about-overview img { max-width: 100%; height: auto; border-radius: 8px; }
+  .blend-about-overview a { color: var(--ba-blue-dark); }
+
+  .blend-about-side { position: sticky; top: 24px; display: grid; gap: 20px; }
+  .blend-about-video { position: relative; display: block; border-radius: 14px; overflow: hidden; box-shadow: 0 10px 28px rgba(2,6,23,.18); }
+  .blend-about-video img { display: block; width: 100%; height: auto; }
+  .blend-about-play { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(2,6,23,.28); }
+  .blend-about-play span { display: grid; place-items: center; width: 64px; height: 64px; padding-left: 4px; border-radius: 50%; background: rgba(255,255,255,.92); color: var(--ba-blue-dark); font-size: 22px; }
+  .blend-about-card { padding: 22px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+  .blend-about-card h3 { margin: 0 0 14px; color: #0f172a; font-size: 16px; font-weight: 800; }
+  .blend-about-facts { list-style: none; margin: 0; padding: 0; }
+  .blend-about-facts .important-dates-item { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; padding: 12px 0; border-top: 1px solid #f1f5f9; }
+  .blend-about-facts .important-dates-item:first-child { border-top: 0; }
+  .blend-about-facts .icon { color: var(--ba-blue-dark); text-align: center; }
+  .blend-about-facts .important-dates-item-title { margin: 0 0 2px; color: #667085; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+  .blend-about-facts .important-dates-item-text { display: block; color: #111827; font-size: 14px; font-weight: 600; }
+  .blend-about-facts .important-dates-item-text a { color: var(--ba-blue-dark); }
+  .blend-about-facts .tip { margin: 6px 0 0; color: #667085; font-size: 12px; line-height: 1.5; }
+  .blend-about-extra h1, .blend-about-extra h2 { font-size: 15px; color: #0f172a; }
+
+  @media (max-width: 980px) { .blend-about-hero-inner { flex-direction: column; } .blend-about-hero-right { align-items: flex-start; } .blend-about-join { align-items: flex-start; } .blend-about-body { grid-template-columns: 1fr; } .blend-about-side { position: static; } }
+  @media (max-width: 600px) { .blend-about-hero h1 { font-size: 30px; } .blend-about-section-title { font-size: 24px; } }
+</style>
+
+<section class="course-info blend-about">
+
+  <header class="blend-about-hero" style="background-image: url('${course_image_urls['large']}');">
+    <div class="blend-about-hero-inner">
+      <div class="blend-about-hero-left">
+        <h1>${course.display_name_with_default}</h1>
+        <p class="blend-about-offered">${_("Offered by {org}").format(org=course.display_org_with_default)}</p>
+        % if short_desc:
+          <p class="blend-about-sub">${short_desc}</p>
+        % endif
+
+        % if date_range_label:
+          <div class="blend-about-session">
+            <span><span class="fa fa-calendar" aria-hidden="true"></span> ${date_range_label}</span>
+          </div>
+        % endif
+
+        <p class="blend-about-enrolled">${_("{count} already enrolled").format(count=enroll_count)}</p>
+      </div>
+
+      <div class="blend-about-hero-right">
+        <div class="blend-about-orgbadge">${course.display_org_with_default}</div>
+
+        <div class="blend-about-join main-cta">
+        %if user.is_authenticated and registered:
+          %if show_courseware_link:
+            <a class="blend-join-btn" href="${course_target}">${_("View Course")}</a>
+          %endif
+          <div class="blend-join-enrolled"><span class="fa fa-check-circle" aria-hidden="true"></span> ${_("You are enrolled in this course")}</div>
+        % elif is_course_full:
+          <span class="blend-join-btn is-disabled">${_("Course is full")}</span>
+        % elif invitation_only and not can_enroll:
+          <span class="blend-join-btn is-disabled">${_("By invitation only")}</span>
+        % elif not is_shib_course and not can_enroll:
+          <span class="blend-join-btn is-disabled">${_("Enrollment is Closed")}</span>
+        %elif allow_anonymous:
+          %if show_courseware_link:
+            <a class="blend-join-btn" href="${course_target}">${_("View Course")}</a>
+          %endif
+        %else:
+          <%
+            if ecommerce_checkout:
+              reg_href = ecommerce_checkout_link
+            else:
+              reg_href = "#"
+            if single_paid_mode:
+              href_class = "add-to-cart"
+            else:
+              href_class = "register"
+          %>
+          <a href="${reg_href}" class="blend-join-btn ${href_class}">${_("Join Course")}</a>
+          <div id="register_error"></div>
+        %endif
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="blend-about-body">
+    <div class="blend-about-main">
+      % if staff_access and studio_url is not None:
+        <a class="blend-about-studio" href="${studio_url}">${_("View About Page in studio")}</a>
+      % endif
+      <h2 class="blend-about-section-title">${_("Overview")}</h2>
+      <div class="blend-about-overview">
+        ${loose_clean(get_course_about_section(request, course, "overview"))}
+      </div>
+    </div>
+
+    <aside class="blend-about-side">
+      % if has_video:
+        <a href="#video-modal" class="media blend-about-video" rel="leanModal">
+          <img src="${course_image_urls['large']}" alt="" />
+          <span class="blend-about-play"><span class="fa fa-play" aria-hidden="true"></span></span>
+        </a>
+      % else:
+        <div class="media blend-about-video">
+          <img src="${course_image_urls['large']}" alt="" />
+        </div>
+      % endif
+
+      <div class="blend-about-card">
+        <%include file="course_about_sidebar_header.html" />
+        <h3>${_("Course details")}</h3>
+        <ol class="important-dates blend-about-facts">
+          <li class="important-dates-item">
+            <span class="icon fa fa-info-circle" aria-hidden="true"></span>
+            <div>
+              <p class="important-dates-item-title">${_("Course Number")}</p>
+              <span class="important-dates-item-text course-number">${course.display_number_with_default}</span>
+            </div>
+          </li>
+          % if not course.start_date_is_still_default:
+            <% course_start_date = course.advertised_start or course.start %>
+            <li class="important-dates-item">
+              <span class="icon fa fa-calendar" aria-hidden="true"></span>
+              <div>
+                <p class="important-dates-item-title">${_("Classes Start")}</p>
+                % if isinstance(course_start_date, str):
+                  <span class="important-dates-item-text start-date">${course_start_date}</span>
+                % else:
+                  <span class="important-dates-item-text start-date localized_datetime" data-format="shortDate" data-datetime="${course_start_date.strftime('%Y-%m-%dT%H:%M:%S%z')}" data-language="${LANGUAGE_CODE}"></span>
+                % endif
+              </div>
+            </li>
+          % endif
+          % if course.end:
+            <% course_end_date = course.end %>
+            <li class="important-dates-item">
+              <span class="icon fa fa-calendar" aria-hidden="true"></span>
+              <div>
+                <p class="important-dates-item-title">${_("Classes End")}</p>
+                % if isinstance(course_end_date, str):
+                  <span class="important-dates-item-text final-date">${course_end_date}</span>
+                % else:
+                  <span class="important-dates-item-text final-date localized_datetime" data-format="shortDate" data-datetime="${course_end_date.strftime('%Y-%m-%dT%H:%M:%S%z')}" data-language="${LANGUAGE_CODE}"></span>
+                % endif
+              </div>
+            </li>
+          % endif
+          <li class="important-dates-item">
+            <span class="icon fa fa-users" aria-hidden="true"></span>
+            <div>
+              <p class="important-dates-item-title">${_("Enrolled")}</p>
+              <span class="important-dates-item-text">${enroll_count}</span>
+            </div>
+          </li>
+          % if effort:
+            <li class="important-dates-item">
+              <span class="icon fa fa-pencil" aria-hidden="true"></span>
+              <div>
+                <p class="important-dates-item-title">${_("Estimated Effort")}</p>
+                <span class="important-dates-item-text effort">${effort}</span>
+              </div>
+            </li>
+          % endif
+          %if course_price and (is_cosmetic_price_enabled):
+            <li class="important-dates-item">
+              <span class="icon fa fa-money" aria-hidden="true"></span>
+              <div>
+                <p class="important-dates-item-title">${_("Price")}</p>
+                <span class="important-dates-item-text">${course_price}</span>
+              </div>
+            </li>
+          %endif
+          % if pre_requisite_courses:
+            <% prc_target = reverse('about_course', args=[str(pre_requisite_courses[0]['key'])]) %>
+            <li class="prerequisite-course important-dates-item">
+              <span class="icon fa fa-list-ul" aria-hidden="true"></span>
+              <div>
+                <p class="important-dates-item-title">${_("Prerequisites")}</p>
+                <span class="important-dates-item-text pre-requisite"><a href="${prc_target}">${pre_requisite_courses[0]['display']}</a></span>
+                <p class="tip">
+                ${Text(_("You must successfully complete {link_start}{prc_display}{link_end} before you begin this course.")).format(
+                  link_start=HTML('<a href="{}">').format(prc_target),
+                  link_end=HTML('</a>'),
+                  prc_display=pre_requisite_courses[0]['display'],
+                )}
+                </p>
+              </div>
+            </li>
+          % endif
+          % if get_course_about_section(request, course, "prerequisites"):
+            <li class="important-dates-item">
+              <span class="icon fa fa-book" aria-hidden="true"></span>
+              <div>
+                <p class="important-dates-item-title">${_("Requirements")}</p>
+                <span class="important-dates-item-text prerequisites">${get_course_about_section(request, course, "prerequisites")}</span>
+              </div>
+            </li>
+          % endif
+        </ol>
+      </div>
+
+      % if get_course_about_section(request, course, "ocw_links"):
+        <div class="blend-about-card blend-about-extra additional-resources">
+          <h1>${_("Additional Resources")}</h1>
+          <h2 class="opencourseware">MITOpenCourseware</h2>
+          ${get_course_about_section(request, course, "ocw_links")}
+        </div>
+      % endif
+
+      % if sidebar_html_enabled:
+        % if get_course_about_section(request, course, "about_sidebar_html"):
+          <section class="blend-about-card about-sidebar-html">
+            ${get_course_about_section(request, course, "about_sidebar_html")}
+          </section>
+        % endif
+      % endif
+    </aside>
+  </div>
+</section>
+
+%if active_reg_button or is_shib_course:
+  <div style="display: none;">
+    <form id="class_enroll_form" method="post" data-remote="true" action="${reverse('change_enrollment')}">
+      <fieldset class="enroll_fieldset">
+        <legend class="sr">${pgettext("self","Enroll")}</legend>
+        <input name="course_id" type="hidden" value="${course.id}">
+        <input name="enrollment_action" type="hidden" value="enroll">
+      </fieldset>
+      <div class="submit">
+        <input name="submit" type="submit" value="${pgettext('self','enroll')}">
+      </div>
+    </form>
+  </div>
+%endif
+
+<%include file="../video_modal.html" />
+
+<%static:require_module_async module_name="js/dateutil_factory" class_name="DateUtilFactory">
+    DateUtilFactory.transform(iterationKey=".localized_datetime");
+</%static:require_module_async>

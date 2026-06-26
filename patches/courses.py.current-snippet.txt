@@ -1,0 +1,14 @@
+def get_cms_course_link(course, page='course'):
+    """
+    Returns a link to course_index for editing the course in cms,
+    assuming that the course is actually cms-backed.
+    """
+    # This is fragile, but unfortunately the problem is that within the LMS we
+    # can't use the reverse calls from the CMS
+    return f"http://{settings.CMS_BASE}/{page}/{str(course.id)}"
+
+
+def get_cms_block_link(block, page):
+    """
+    Returns a link to block_index for editing the course in cms,
+    assuming that the block is actually cms-backed.
