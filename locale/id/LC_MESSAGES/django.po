@@ -143,3 +143,12 @@ msgstr "Aktif"
 
 msgid "No related program data is available for your current enrollments."
 msgstr "Tidak ada data program terkait untuk pendaftaran Anda saat ini."
+
+msgid "Passed - claim certificate"
+msgstr "Lulus - klaim sertifikat"
+
+msgid "Congratulations, you passed! Pay to claim your certificate."
+msgstr "Selamat, Anda lulus! Bayar untuk klaim sertifikat."
+
+msgid "Claim Certificate"
+msgstr "Klaim Sertifikat"
