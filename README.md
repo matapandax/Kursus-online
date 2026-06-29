@@ -28,6 +28,16 @@ patches/courses.py.current-snippet.txt                 Catatan satu-satunya patc
 > hanya lapisan tampilan yang di-redesign. Header global hanya disembunyikan via CSS pada
 > `.view-dashboard` (DOM tetap dirender oleh `main.html`).
 
+## Tampilan
+
+Render live (login sebagai `honor`, data nyata DemoX):
+
+### Dashboard
+![Dashboard redesign — galeri kartu](screenshots/dashboard.png)
+
+### Progress
+![Progress redesign — dashboard kartu](screenshots/progress.png)
+
 ## Cara deploy
 1. Salin `theme/custom-theme/` ke `/edx/var/edxapp/themes/custom-theme/` (owner `edxapp`).
 2. Salin `locale/id/...` ke `/edx/var/edxapp/locale/id/...` (owner `edxapp`).
