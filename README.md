@@ -11,7 +11,8 @@ konfigurasi/database yang bukan berupa file.
 ## Struktur
 ```
 theme/custom-theme/      Comprehensive theme (template Mako override)
-  lms/templates/dashboard.html                         Dashboard SaaS (brand color, Continue learning, Course schedule, sertifikat, i18n)
+  lms/templates/dashboard.html                         Dashboard galeri kartu (top-nav menggantikan sidebar, hero Continue learning, header global OpenedX disembunyikan + menu akun pindah ke nav, gambar kursus asli)
+  lms/templates/courseware/progress.html               Halaman Progress redesign (ring nilai, Grade Composition per kategori, akordeon bab + skor problem, kartu sertifikat gradient)
   lms/templates/courseware/course_about.html           Halaman About gaya XuetangX
   lms/templates/certificates/valid.html                Halaman sertifikat gaya Accredible
   lms/templates/certificates/_accomplishment-rendering.html  Desain kartu sertifikat
@@ -20,6 +21,12 @@ theme/custom-theme/      Comprehensive theme (template Mako override)
 locale/id/LC_MESSAGES/django.po(.mo)                   Terjemahan ID tambahan utk string custom dashboard
 patches/courses.py.current-snippet.txt                 Catatan satu-satunya patch core (http:// link Studio)
 ```
+
+> Halaman **Progress** dan **Dashboard** memakai satu bahasa desain yang konsisten (sistem kartu,
+> palet biru–ungu, ring & progress bar, gradient `#1e293b→#312e81`). Semua logika fungsional
+> (grades, sertifikat, enroll/unenroll, programs, schedule, modal & JS) dipertahankan apa adanya;
+> hanya lapisan tampilan yang di-redesign. Header global hanya disembunyikan via CSS pada
+> `.view-dashboard` (DOM tetap dirender oleh `main.html`).
 
 ## Cara deploy
 1. Salin `theme/custom-theme/` ke `/edx/var/edxapp/themes/custom-theme/` (owner `edxapp`).
