@@ -1,0 +1,597 @@
+<%page expression_filter="h"/>
+<%inherit file="/main.html" />
+<%namespace name='static' file='/static_content.html'/>
+<%def name="online_help_token()"><% return "progress" %></%def>
+<%!
+from datetime import datetime
+
+from django.conf import settings
+from django.urls import reverse
+from urllib.parse import quote_plus
+from django.utils.translation import gettext as _
+from pytz import UTC
+
+from common.djangoapps.course_modes.models import CourseMode
+from lms.djangoapps.certificates.data import CertificateStatuses
+from lms.djangoapps.grades.api import constants as grades_constants
+from openedx.core.djangolib.markup import HTML, Text
+from openedx.features.enterprise_support.utils import get_enterprise_learner_generic_name
+%>
+
+<%
+username = get_enterprise_learner_generic_name(request) or student.username
+
+## ---- Derived grade values (safe / defensive) ----
+overall_percent = 0
+try:
+    overall_percent = int(round(float(grade_summary.get('percent', 0)) * 100))
+except Exception:
+    overall_percent = 0
+
+passing_cutoff = 0
+try:
+    cutoffs = [v for v in (course.grade_cutoffs or {}).values()]
+    passing_cutoff = int(round(min(cutoffs) * 100)) if cutoffs else 0
+except Exception:
+    passing_cutoff = 0
+
+letter_grade = None
+try:
+    letter_grade = grade_summary.get('grade')
+except Exception:
+    letter_grade = None
+
+is_passing = bool(letter_grade) or (passing_cutoff and overall_percent >= passing_cutoff)
+grade_gap = overall_percent - passing_cutoff
+
+## ---- Grade composition bars (achievement within each weighted category) ----
+## grade_breakdown is an OrderedDict/list of {category, percent (weighted contribution), detail}.
+## Category weights come from course.raw_grader; achievement = contribution / weight.
+bar_palette = ['#2563eb', '#7c3aed', '#16a34a', '#d97706', '#0891b2', '#db2777']
+
+category_weights = {}
+try:
+    for _entry in (getattr(course, 'raw_grader', None) or []):
+        category_weights[_entry.get('type')] = float(_entry.get('weight', 0))
+except Exception:
+    category_weights = {}
+
+grade_bars = []
+try:
+    _gb = grade_summary.get('grade_breakdown', []) or []
+    _items = list(_gb.values()) if hasattr(_gb, 'values') else list(_gb)
+    for _it in _items:
+        if not hasattr(_it, 'get'):
+            continue
+        _cat = _it.get('category', '') or ''
+        _contrib = float(_it.get('percent', 0) or 0)        # 0..weight  (share of final grade)
+        _weight = category_weights.get(_cat, 0)
+        _achv = (_contrib / _weight) if _weight else 0       # 0..1 within the category
+        grade_bars.append({
+            'name': _cat,
+            'achv': max(0.0, min(_achv, 1.0)) * 100,          # achievement %
+            'weight': _weight * 100,                          # weight %
+            'detail': _it.get('detail', '') or '',
+        })
+except Exception:
+    grade_bars = []
+
+## ---- Course completion estimate from courseware summary ----
+done_sections = 0
+total_sections = 0
+try:
+    for _ch in (courseware_summary or []):
+        if _ch.get('display_name') == 'hidden':
+            continue
+        for _sec in _ch['sections']:
+            total_sections += 1
+            if float(_sec.graded_total.possible) > 0 and _sec.percent_graded >= 1:
+                done_sections += 1
+except Exception:
+    pass
+completion_pct = int(round(done_sections * 100 / total_sections)) if total_sections else 0
+%>
+
+<%block name="bodyclass">view-in-course view-progress</%block>
+
+<%block name="headextra">
+<%static:css group='style-course-vendor'/>
+<%static:css group='style-course'/>
+<style>
+/* ====== Progress redesign (scoped) ====== */
+.progress-redesign{ --pr-bg:#f4f6fb; --pr-surface:#fff; --pr-ink:#1a2233; --pr-soft:#5b6678; --pr-faint:#8a93a6; --pr-line:#e6eaf2; --pr-brand:#2563eb; --pr-brand-soft:#e8efff; --pr-green:#16a34a; --pr-green-soft:#e7f6ee; --pr-amber:#d97706; --pr-amber-soft:#fdf0dd; --pr-purple:#7c3aed; --pr-shadow:0 1px 2px rgba(16,24,40,.04),0 8px 24px rgba(16,24,40,.06); }
+.progress-redesign{ background:var(--pr-bg); color:var(--pr-ink); font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; padding:24px 0 64px; }
+.progress-redesign *{ box-sizing:border-box; }
+.progress-redesign .pr-wrap{ max-width:1120px; margin:0 auto; padding:0 24px; }
+.progress-redesign a{ color:var(--pr-brand); text-decoration:none; }
+.progress-redesign a:hover{ text-decoration:underline; }
+.progress-redesign h2,.progress-redesign h3,.progress-redesign h4{ margin:0; }
+
+.progress-redesign .pr-head{ display:flex; align-items:center; gap:18px; margin-bottom:22px; flex-wrap:wrap; }
+.progress-redesign .pr-avatar{ width:56px; height:56px; border-radius:50%; background:linear-gradient(135deg,#fca5a5,#c084fc); color:#fff; display:grid; place-items:center; font-size:22px; font-weight:700; flex:none; text-transform:uppercase; }
+.progress-redesign .pr-who{ font-size:21px; font-weight:800; }
+.progress-redesign .pr-meta{ font-size:13px; color:var(--pr-faint); margin-top:2px; }
+.progress-redesign .pr-pill{ display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; padding:5px 12px; border-radius:999px; margin-left:auto; }
+.progress-redesign .pr-pill.pass{ background:var(--pr-green-soft); color:var(--pr-green); }
+.progress-redesign .pr-pill.nopass{ background:var(--pr-amber-soft); color:var(--pr-amber); }
+
+.progress-redesign .pr-stat-cards{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:18px; }
+.progress-redesign .pr-scard{ background:var(--pr-surface); border:1px solid var(--pr-line); border-radius:14px; padding:16px 18px; box-shadow:var(--pr-shadow); }
+.progress-redesign .pr-scard .ic{ width:36px; height:36px; border-radius:10px; display:grid; place-items:center; font-size:17px; margin-bottom:10px; }
+.progress-redesign .pr-scard .big{ font-size:23px; font-weight:800; }
+.progress-redesign .pr-scard .cap{ font-size:12.5px; color:var(--pr-faint); }
+.progress-redesign .ic.b{ background:var(--pr-brand-soft); color:var(--pr-brand);} .progress-redesign .ic.g{ background:var(--pr-green-soft); color:var(--pr-green);} .progress-redesign .ic.a{ background:var(--pr-amber-soft); color:var(--pr-amber);} .progress-redesign .ic.p{ background:#f1eafe; color:var(--pr-purple);}
+
+.progress-redesign .pr-grid{ display:grid; grid-template-columns:1.15fr 1fr; gap:18px; }
+.progress-redesign .pr-card{ background:var(--pr-surface); border:1px solid var(--pr-line); border-radius:16px; box-shadow:var(--pr-shadow); padding:22px; }
+.progress-redesign .pr-card .pr-ct{ font-size:13px; letter-spacing:.03em; text-transform:uppercase; color:var(--pr-faint); margin-bottom:16px; font-weight:700; }
+
+.progress-redesign .pr-hero{ display:flex; gap:24px; align-items:center; }
+.progress-redesign .pr-ring{ position:relative; flex:none; }
+.progress-redesign .pr-ring .lbl{ position:absolute; inset:0; display:grid; place-items:center; text-align:center; }
+.progress-redesign .pr-ring .pct{ font-size:30px; font-weight:800; }
+.progress-redesign .pr-ring .sub{ font-size:11px; color:var(--pr-faint); }
+.progress-redesign .pr-hstats{ display:grid; gap:12px; flex:1; }
+.progress-redesign .pr-srow{ display:flex; justify-content:space-between; align-items:baseline; padding-bottom:11px; border-bottom:1px dashed var(--pr-line); }
+.progress-redesign .pr-srow:last-child{ border-bottom:0; padding-bottom:0; }
+.progress-redesign .pr-srow .k{ font-size:13px; color:var(--pr-soft);} .progress-redesign .pr-srow .v{ font-size:16px; font-weight:800;}
+.progress-redesign .v.green{ color:var(--pr-green);} .progress-redesign .v.amber{ color:var(--pr-amber);}
+
+.progress-redesign .pr-bar{ margin-bottom:16px; } .progress-redesign .pr-bar:last-child{ margin-bottom:0; }
+.progress-redesign .pr-bar-top{ display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px; gap:8px; }
+.progress-redesign .pr-bar-top .name{ font-weight:700;} .progress-redesign .pr-bar-top .name small{ font-weight:500; color:var(--pr-faint);} .progress-redesign .pr-bar-top .num{ color:var(--pr-soft); font-weight:700; white-space:nowrap;}
+.progress-redesign .pr-track{ height:9px; background:#eef1f7; border-radius:999px; overflow:hidden; }
+.progress-redesign .pr-fill{ height:100%; border-radius:999px; }
+
+.progress-redesign .pr-cert,
+.progress-redesign #course-success.pr-cert{ background:linear-gradient(135deg,#1e293b,#312e81) !important; color:#fff !important; border:0 !important; position:relative; overflow:hidden; margin-top:18px; text-align:left !important; }
+.progress-redesign .pr-cert::after{ content:""; position:absolute; right:-40px; top:-40px; width:160px; height:160px; border-radius:50%; background:rgba(255,255,255,.06);}
+.progress-redesign .pr-cert .pr-ct{ color:rgba(255,255,255,.7) !important;}
+.progress-redesign .pr-cert-row{ display:flex; align-items:center; gap:24px; flex-wrap:wrap; }
+.progress-redesign .pr-cert-col{ flex:1; min-width:240px; }
+.progress-redesign .pr-cert .pr-cert-emoji{ margin-right:2px; }
+.progress-redesign .pr-cert .ttl{ font-size:18px; font-weight:800; margin:2px 0 6px; color:#fff !important;}
+.progress-redesign .pr-cert .copy{ font-size:13px; color:rgba(255,255,255,.8) !important; margin:0 0 16px; max-width:90%;}
+.progress-redesign .pr-btn{ display:inline-flex; align-items:center; gap:8px; background:var(--pr-brand); color:#fff; border:0; cursor:pointer; padding:10px 18px; border-radius:10px; font-size:13.5px; font-weight:700; }
+.progress-redesign .pr-btn:hover{ filter:brightness(1.05); text-decoration:none; }
+/* certificate button = white pill like the mockup; beats core #course-success>a */
+.progress-redesign .pr-cert .pr-btn,
+.progress-redesign #course-success.pr-cert .pr-btn{ background:#fff !important; background-image:none !important; color:#1e293b !important; border:0 !important; box-shadow:none !important; text-shadow:none !important; border-radius:10px !important; padding:10px 18px !important; font-weight:700 !important; }
+.progress-redesign .pr-cert .pr-btn:hover{ background:#f1f5f9 !important; color:#1e293b !important; }
+
+.progress-redesign .pr-credit{ margin-top:18px; }
+.progress-redesign .pr-credit .requirement{ display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--pr-line); font-size:14px; }
+.progress-redesign .pr-credit .requirement:last-child{ border-bottom:0; }
+.progress-redesign .pr-credit .requirement-name{ font-weight:600; }
+.progress-redesign .pr-credit .fa-check{ color:var(--pr-green);} .progress-redesign .pr-credit .fa-times{ color:#dc2626;}
+
+.progress-redesign .pr-sec-head{ display:flex; align-items:center; justify-content:space-between; margin:30px 0 14px; }
+.progress-redesign .pr-sec-head h2{ font-size:18px; }
+.progress-redesign .pr-chapter{ background:var(--pr-surface); border:1px solid var(--pr-line); border-radius:14px; box-shadow:var(--pr-shadow); margin-bottom:14px; overflow:hidden; }
+.progress-redesign .pr-ch-head{ display:flex; align-items:center; gap:14px; padding:16px 20px; cursor:pointer; }
+.progress-redesign .pr-ch-head:hover{ background:#fafbfe; }
+.progress-redesign .pr-ch-idx{ width:30px; height:30px; flex:none; border-radius:8px; background:var(--pr-brand-soft); color:var(--pr-brand); font-weight:800; display:grid; place-items:center; font-size:13px; }
+.progress-redesign .pr-ch-title{ font-weight:700; font-size:15px; }
+.progress-redesign .pr-ch-sub{ font-size:12px; color:var(--pr-faint); }
+.progress-redesign .pr-ch-right{ margin-left:auto; display:flex; align-items:center; gap:16px; }
+.progress-redesign .pr-ch-prog{ width:120px; }
+.progress-redesign .pr-ch-score{ font-weight:800; font-size:14px; min-width:54px; text-align:right; }
+.progress-redesign .pr-caret{ color:var(--pr-faint); transition:transform .2s; font-style:normal; }
+.progress-redesign .pr-chapter.open .pr-caret{ transform:rotate(90deg); }
+.progress-redesign .pr-ch-body{ display:none; padding:4px 20px 14px; border-top:1px solid var(--pr-line); }
+.progress-redesign .pr-chapter.open .pr-ch-body{ display:block; }
+
+.progress-redesign .pr-unit{ padding:13px 4px; border-bottom:1px solid var(--pr-line); }
+.progress-redesign .pr-unit:last-child{ border-bottom:0; }
+.progress-redesign .pr-unit-row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.progress-redesign .pr-dot{ width:9px; height:9px; border-radius:50%; flex:none; }
+.progress-redesign .pr-dot.done{ background:var(--pr-green);} .progress-redesign .pr-dot.partial{ background:var(--pr-amber);} .progress-redesign .pr-dot.todo{ background:#cdd4e0;}
+.progress-redesign .pr-uname{ font-size:14px; font-weight:600; }
+.progress-redesign .pr-tag{ font-size:11px; font-weight:700; padding:2px 8px; border-radius:6px; background:#f0f3fa; color:var(--pr-soft); }
+.progress-redesign .pr-tag.exam{ background:var(--pr-amber-soft); color:var(--pr-amber);} .progress-redesign .pr-tag.hw{ background:var(--pr-brand-soft); color:var(--pr-brand);} .progress-redesign .pr-tag.lab{ background:#f1eafe; color:var(--pr-purple);}
+.progress-redesign .pr-due{ font-size:12px; color:var(--pr-faint); }
+.progress-redesign .pr-uright{ margin-left:auto; display:flex; align-items:center; gap:12px; }
+.progress-redesign .pr-pips{ display:flex; gap:5px; flex-wrap:wrap; }
+.progress-redesign .pr-pip{ font-size:11px; font-weight:700; color:#fff; min-width:34px; text-align:center; padding:3px 5px; border-radius:6px; }
+.progress-redesign .pr-pip.full{ background:var(--pr-green);} .progress-redesign .pr-pip.part{ background:var(--pr-amber);} .progress-redesign .pr-pip.zero{ background:#c2c9d6;}
+.progress-redesign .pr-utotal{ font-weight:800; font-size:14px; min-width:64px; text-align:right; }
+.progress-redesign .pr-note{ font-size:12px; color:var(--pr-faint); margin:6px 0 0 21px; }
+.progress-redesign .pr-note.warn{ color:var(--pr-amber); }
+
+.progress-redesign .pr-legend{ display:flex; gap:18px; flex-wrap:wrap; font-size:12px; color:var(--pr-soft); margin-top:18px; }
+.progress-redesign .pr-legend span{ display:inline-flex; align-items:center; gap:6px; }
+.progress-redesign .pr-ldot{ width:9px; height:9px; border-radius:50%; display:inline-block; }
+
+.progress-redesign .wrap-instructor-info{ text-align:right; margin-bottom:12px; }
+.progress-redesign .errors-info{ color:#dc2626; }
+
+@media (max-width:880px){
+  .progress-redesign .pr-grid{ grid-template-columns:1fr; }
+  .progress-redesign .pr-stat-cards{ grid-template-columns:repeat(2,1fr); }
+  .progress-redesign .pr-ch-prog{ display:none; }
+}
+</style>
+</%block>
+
+<%block name="pagetitle">${_("{course_number} Progress").format(course_number=course.display_number_with_default)}</%block>
+
+<%block name="js_extra">
+<script type="text/javascript" src="${static.url('js/courseware/certificates_api.js')}"></script>
+<script type="text/javascript" src="${static.url('js/courseware/credit_progress.js')}"></script>
+</%block>
+
+<%include file="/courseware/course_navigation.html" args="active_page='progress'" />
+
+<main id="main" aria-label="Content" tabindex="-1">
+  <div class="progress-redesign">
+    <div class="pr-wrap"
+      % if getattr(course, 'language'):
+        lang="${course.language}"
+      % endif
+      >
+
+      % if staff_access and studio_url is not None:
+      <div class="wrap-instructor-info">
+        <a class="instructor-info-action studio-view" href="${studio_url}">${_("View Grading in studio")}</a>
+      </div>
+      % endif
+
+      ## ===== Page header =====
+      <div class="pr-head">
+        <div class="pr-avatar">${username[:2]}</div>
+        <div>
+          <h2 class="pr-who">${_("Course Progress")} &mdash; ${username}</h2>
+          <div class="pr-meta">${student.email}</div>
+        </div>
+        % if is_passing:
+        <span class="pr-pill pass">&#9679; ${_("Meets passing requirement")}</span>
+        % else:
+        <span class="pr-pill nopass">&#9679; ${_("Not yet passing")}</span>
+        % endif
+      </div>
+
+      % if course_expiration_fragment:
+        ${HTML(course_expiration_fragment.content)}
+      % endif
+
+      ## ===== Summary stat cards =====
+      <div class="pr-stat-cards">
+        <div class="pr-scard">
+          <div class="ic b">&#128202;</div>
+          <div class="big">${overall_percent}%</div>
+          <div class="cap">${_("Current total grade")}</div>
+        </div>
+        <div class="pr-scard">
+          <div class="ic g">&#10003;</div>
+          <div class="big">${done_sections} / ${total_sections}</div>
+          <div class="cap">${_("Subsections completed")}</div>
+        </div>
+        <div class="pr-scard">
+          <div class="ic a">&#127919;</div>
+          <div class="big">${passing_cutoff}%</div>
+          <div class="cap">${_("Passing grade")}</div>
+        </div>
+        <div class="pr-scard">
+          <div class="ic p">&#127942;</div>
+          <div class="big">${letter_grade if letter_grade else _('--')}</div>
+          <div class="cap">${_("Grade")}</div>
+        </div>
+      </div>
+
+      ## ===== Main grid: grade ring + breakdown =====
+      <div class="pr-grid">
+        % if not course.disable_progress_graph:
+        <div class="pr-card">
+          <div class="pr-ct">${_("Grade Summary")}</div>
+          <div class="pr-hero">
+            <%
+            circ = 389.6
+            dash_off = circ * (1 - (overall_percent / 100.0))
+            %>
+            <div class="pr-ring">
+              <svg width="150" height="150" viewBox="0 0 150 150">
+                <circle cx="75" cy="75" r="62" fill="none" stroke="#eef1f7" stroke-width="14"/>
+                <circle cx="75" cy="75" r="62" fill="none" stroke="url(#prg1)" stroke-width="14"
+                  stroke-linecap="round" stroke-dasharray="${circ}" stroke-dashoffset="${dash_off}"
+                  transform="rotate(-90 75 75)"/>
+                <defs><linearGradient id="prg1" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="#2563eb"/><stop offset="1" stop-color="#7c3aed"/>
+                </linearGradient></defs>
+              </svg>
+              <div class="lbl"><div>
+                <div class="pct">${overall_percent}%</div>
+                <div class="sub">${letter_grade if letter_grade else _('In progress')}</div>
+              </div></div>
+            </div>
+            <div class="pr-hstats">
+              <div class="pr-srow"><span class="k">${_("Pass status")}</span>
+                % if is_passing:
+                <span class="v green">${_("Passing")}</span>
+                % else:
+                <span class="v amber">${_("In progress")}</span>
+                % endif
+              </div>
+              <div class="pr-srow"><span class="k">${_("Passing grade")}</span><span class="v">${passing_cutoff}%</span></div>
+              <div class="pr-srow"><span class="k">${_("Margin vs passing")}</span>
+                <span class="v ${'green' if grade_gap >= 0 else 'amber'}">${'+' if grade_gap >= 0 else ''}${grade_gap}%</span>
+              </div>
+              <div class="pr-srow"><span class="k">${_("Course completion")}</span><span class="v">${completion_pct}%</span></div>
+            </div>
+          </div>
+        </div>
+        % endif
+
+        % if grade_bars:
+        <div class="pr-card">
+          <div class="pr-ct">${_("Grade Composition")}</div>
+          %for i, gb in enumerate(grade_bars):
+            <%
+            gb_color = bar_palette[i % len(bar_palette)]
+            %>
+            <div class="pr-bar">
+              <div class="pr-bar-top">
+                <span class="name">${gb['name']}
+                  % if gb['weight']:
+                  <small>${"{0:.0f}%".format(gb['weight'])} ${_("of grade")}</small>
+                  % endif
+                </span>
+                <span class="num">${"{0:.0f}%".format(gb['achv'])}</span>
+              </div>
+              <div class="pr-track"><div class="pr-fill" style="width:${"{0:.0f}".format(gb['achv'])}%;background:${gb_color}"></div></div>
+              % if gb['detail']:
+              <div class="pr-note">${gb['detail']}</div>
+              % endif
+            </div>
+          %endfor
+        </div>
+        % endif
+      </div>
+
+      ## ===== Certificate card (keeps original IDs/classes for certificates_api.js) =====
+      <div class="wrapper-msg wrapper-auto-cert">
+        <div id="errors-info" class="errors-info"></div>
+        <%block name="certificate_block">
+          %if certificate_data:
+          <div class="pr-card pr-cert" id="course-success">
+            <% post_url = reverse('generate_user_cert', args=[str(course.id)]) %>
+            <div class="pr-ct">${_("Certificate")}</div>
+            <div class="pr-cert-row">
+              <div class="pr-cert-col">
+                <div class="ttl"><span class="pr-cert-emoji" aria-hidden="true">&#127881;</span> ${_(certificate_data.title)}</div>
+                <p class="copy">${_(certificate_data.msg)}</p>
+                %if certificate_data.cert_web_view_url:
+                <a class="pr-btn" href="${certificate_data.cert_web_view_url}" rel="noopener" target="_blank">${_("View Certificate")} <span aria-hidden="true">&rarr;</span><span class="sr">${_("Opens in a new browser window")}</span></a>
+                %elif certificate_data.cert_status == CertificateStatuses.requesting:
+                <button class="pr-btn generate_certs" data-endpoint="${post_url}" id="btn_generate_cert">${_('Request Certificate')} <span aria-hidden="true">&rarr;</span></button>
+                %endif
+              </div>
+            </div>
+          </div>
+          %endif
+        </%block>
+      </div>
+
+      ## ===== Credit requirements (keeps original classes for credit_progress.js) =====
+      % if credit_course_requirements:
+      <section class="pr-card pr-credit credit-eligibility">
+        <div class="pr-ct">${_("Requirements for Course Credit")}</div>
+        <div class="credit-eligibility-container">
+          %if credit_course_requirements['eligibility_status'] == 'not_eligible':
+          <span class="eligibility_msg">${_("{student_name}, you are no longer eligible for credit in this course.").format(student_name=student.profile.name)}</span>
+          %elif credit_course_requirements['eligibility_status'] == 'eligible':
+          <span class="eligibility_msg">
+            ${Text(_("{student_name}, you have met the requirements for credit in this course. {a_start}Go to your dashboard{a_end} to purchase course credit.")).format(
+                student_name=student.profile.name,
+                a_start=HTML("<a href={url}>").format(url=reverse('dashboard')),
+                a_end=HTML("</a>")
+            )}
+          </span>
+          %elif credit_course_requirements['eligibility_status'] == 'partial_eligible':
+          <span>${_("{student_name}, you have not yet met the requirements for credit.").format(student_name=student.profile.name)}</span>
+          %endif
+
+          <a href="${settings.CREDIT_HELP_LINK_URL}" class="credit-help">
+            <span class="fa fa-question" aria-hidden="true"></span>
+            <span class="sr">${_("Information about course credit requirements")}</span>
+          </a>
+
+          <div class="requirement-container" data-eligible="${credit_course_requirements['eligibility_status']}">
+            %for requirement in credit_course_requirements['requirements']:
+            <div class="requirement">
+              <div class="requirement-name">
+                ${_(requirement['display_name'])}
+                %if requirement['namespace'] == 'grade':
+                <span>${int(requirement['criteria']['min_grade'] * 100)}%</span>
+                %endif
+              </div>
+              <div class="requirement-status">
+                %if requirement['status']:
+                  %if requirement['status'] == 'submitted':
+                  <span class="requirement-submitted">${_("Verification Submitted")}</span>
+                  %elif requirement['status'] == 'failed':
+                  <span class="fa fa-times" aria-hidden="true"></span>
+                  <span>${_("Verification Failed" )}</span>
+                  %elif requirement['status'] == 'declined':
+                  <span class="fa fa-times" aria-hidden="true"></span>
+                  <span>${_("Verification Declined" )}</span>
+                  %elif requirement['status'] == 'satisfied':
+                  <span class="fa fa-check" aria-hidden="true"></span>
+                  <span class="localized-datetime" data-datetime="${requirement['status_date']}" data-string="${_('Completed by {date}')}" data-timezone="${user_timezone}" data-language="${user_language}"></span>
+                  %endif
+                %else:
+                <span class="not-achieve">${_("Upcoming")}</span>
+                %endif
+              </div>
+            </div>
+            %endfor
+          </div>
+          <button class="detail-collapse">
+            <span class="fa fa-caret-up" aria-hidden="true"></span>
+            <span class="requirement-detail">${_("Less")}</span>
+          </button>
+        </div>
+      </section>
+      % endif
+
+      ## ===== Chapters / accordion =====
+      %if courseware_summary:
+      <div class="pr-sec-head">
+        <h2>${_("Course Content")}</h2>
+      </div>
+      <h2 class="sr">${_('Details for each chapter')}</h2>
+      %for chapter in courseware_summary:
+        %if not chapter['display_name'] == "hidden":
+        <%
+        ch_earned = 0.0
+        ch_possible = 0.0
+        graded_secs = 0
+        for s in chapter['sections']:
+            try:
+                ch_earned += float(s.graded_total.earned)
+                ch_possible += float(s.graded_total.possible)
+                if float(s.graded_total.possible) > 0:
+                    graded_secs += 1
+            except Exception:
+                pass
+        ch_pct = int(round(ch_earned * 100 / ch_possible)) if ch_possible > 0 else 0
+        ch_color = '#16a34a' if ch_pct >= 80 else ('#2563eb' if ch_pct > 0 else '#cdd4e0')
+        is_open = (loop.index == 0)
+        %>
+        <section class="pr-chapter ${'open' if is_open else ''}" aria-labelledby="chapter_${loop.index}">
+          <div class="pr-ch-head js-pr-toggle">
+            <div class="pr-ch-idx">${loop.index + 1}</div>
+            <div>
+              <div class="pr-ch-title" id="chapter_${loop.index}">${chapter['display_name']}</div>
+              <div class="pr-ch-sub">${len(chapter['sections'])} ${_("subsections")} &middot; ${graded_secs} ${_("graded")}</div>
+            </div>
+            <div class="pr-ch-right">
+              <div class="pr-ch-prog pr-track"><div class="pr-fill" style="width:${ch_pct}%;background:${ch_color}"></div></div>
+              <div class="pr-ch-score" style="color:${ch_color}">${ch_pct if ch_possible > 0 else '--'}${'%' if ch_possible > 0 else ''}</div>
+              <i class="pr-caret">&#8250;</i>
+            </div>
+          </div>
+          <div class="pr-ch-body">
+            %for section in chapter['sections']:
+              <%
+              hide_url_date = (section.self_paced and section.end) or section.due
+              hide_url = not staff_access and section.hide_after_due and hide_url_date and datetime.now(UTC) > hide_url_date
+
+              earned = section.graded_total.earned
+              total = section.graded_total.possible
+              show = section.show_grades(staff_access)
+              has_pts = (total > 0 or earned > 0)
+              percentageString = "{0:.0%}".format(section.percent_graded) if total > 0 or earned > 0 else ""
+
+              if not has_pts:
+                  dot = 'todo'
+              elif section.percent_graded >= 1:
+                  dot = 'done'
+              elif section.percent_graded > 0:
+                  dot = 'partial'
+              else:
+                  dot = 'todo'
+
+              fmt = section.format or ''
+              tag_class = ''
+              fl = fmt.lower()
+              if 'exam' in fl:
+                  tag_class = 'exam'
+              elif 'lab' in fl or 'practice' in fl or 'prakt' in fl:
+                  tag_class = 'lab'
+              elif 'home' in fl or 'tugas' in fl or 'assign' in fl:
+                  tag_class = 'hw'
+              %>
+              <div class="pr-unit">
+                <div class="pr-unit-row">
+                  <span class="pr-dot ${dot}"></span>
+                  %if hide_url:
+                    <span class="pr-uname">${section.display_name}
+                      %if has_pts and show:
+                      <span class="sr">${_("{earned} of {total} possible points").format(earned='{:.3n}'.format(float(earned)), total='{:.3n}'.format(float(total)))}</span>
+                      %endif
+                    </span>
+                  %else:
+                    <a class="pr-uname" href="${reverse('courseware_section', kwargs=dict(course_id=str(course.id), chapter=chapter['url_name'], section=section.url_name))}">
+                      ${section.display_name}
+                      %if has_pts and show:
+                      <span class="sr">${_("{earned} of {total} possible points").format(earned='{:.3n}'.format(float(earned)), total='{:.3n}'.format(float(total)))}</span>
+                      %endif
+                    </a>
+                  %endif
+                  %if fmt:
+                    <span class="pr-tag ${tag_class}">${fmt}</span>
+                  %endif
+                  %if section.due is not None and pacing_type != 'self_paced':
+                    <em class="pr-due localized-datetime" data-datetime="${section.due}" data-string="${_('due {date}')}" data-timezone="${user_timezone}" data-language="${user_language}"></em>
+                  %endif
+
+                  <div class="pr-uright">
+                    %if len(section.problem_scores.values()) > 0 and show:
+                      <div class="pr-pips">
+                        %for score in section.problem_scores.values():
+                          <%
+                          se = float(score.earned); sp = float(score.possible)
+                          pip = 'full' if (sp > 0 and se >= sp) else ('part' if se > 0 else 'zero')
+                          %>
+                          <span class="pr-pip ${pip}">${"{0:.3n}/{1:.3n}".format(se, sp)}</span>
+                        %endfor
+                      </div>
+                    %endif
+                    %if has_pts and show:
+                      <span class="pr-utotal" style="color:${'#16a34a' if section.percent_graded >= 1 else ('#d97706' if section.percent_graded > 0 else '#8a93a6')}">${"{0:.3n}/{1:.3n}".format(float(earned), float(total))}</span>
+                    %endif
+                  </div>
+                </div>
+
+                %if section.override is not None:
+                  <%last_override_history = section.override.get_history().order_by('created').last()%>
+                  %if (not last_override_history or last_override_history.system == grades_constants.GradeOverrideFeatureEnum.proctoring) and section.format == "Exam" and earned == 0:
+                    <div class="pr-note warn">${_("Suspicious activity detected during proctored exam review. Exam score 0.")}</div>
+                  %else:
+                    <div class="pr-note warn">${_("Section grade has been overridden.")}</div>
+                  %endif
+                %endif
+
+                %if len(section.problem_scores.values()) > 0 and not show:
+                  <div class="pr-note">
+                  %if section.show_correctness == 'past_due':
+                    ${_("Problem scores are hidden until the due date.") if section.graded else _("Practice scores are hidden until the due date.")}
+                  %else:
+                    ${_("Problem scores are hidden.") if section.graded else _("Practice scores are hidden.")}
+                  %endif
+                  </div>
+                %elif len(section.problem_scores.values()) == 0:
+                  <div class="pr-note">${_("No problem scores in this section")}</div>
+                %endif
+              </div>
+            %endfor
+          </div>
+        </section>
+        %endif
+      %endfor
+
+      <div class="pr-legend">
+        <span><i class="pr-ldot" style="background:#16a34a"></i> ${_("Completed")}</span>
+        <span><i class="pr-ldot" style="background:#d97706"></i> ${_("In progress")}</span>
+        <span><i class="pr-ldot" style="background:#cdd4e0"></i> ${_("Not started")}</span>
+      </div>
+      %endif
+
+    </div>
+  </div>
+</main>
+
+<script>
+(function(){
+  document.addEventListener('click', function(e){
+    var head = e.target.closest && e.target.closest('.js-pr-toggle');
+    if(!head) return;
+    if(e.target.closest('a')) return;  // let links work
+    head.parentElement.classList.toggle('open');
+  });
+})();
+</script>
+
+<%static:require_module_async module_name="js/dateutil_factory" class_name="DateUtilFactory">
+    DateUtilFactory.transform(iterationKey=".localized-datetime");
+</%static:require_module_async>

@@ -47,125 +47,185 @@ from django.db.models import Max
   brand_primary_dark = configuration_helpers.get_value('PRIMARY_COLOR_DARK', getattr(settings, 'BRAND_PRIMARY_COLOR_DARK', '#1d4ed8'))
 %>
 <style>
-  .blend-dashboard-shell {
-    --blend-blue: ${brand_primary};
-    --blend-blue-dark: ${brand_primary_dark};
-    --blend-ink: #111827;
-    --blend-muted: #667085;
-    --blend-soft: #f8fafc;
-    --blend-panel: #ffffff;
-    --blend-line: #e5e7eb;
-    --blend-line-strong: #d1d5db;
-    --blend-success: #16a34a;
-    --blend-warning: #f59e0b;
-    display: grid;
-    grid-template-columns: 248px minmax(0, 1fr);
-    min-height: calc(100vh - 80px);
-    background: #f3f6fb;
-    color: var(--blend-ink);
-    font-family: Inter, "Helvetica Neue", Arial, sans-serif;
+  /* Sembunyikan header global OpenedX HANYA di dashboard; nd-topbar jadi header-nya. */
+  .view-dashboard .global-header { display: none !important; }
+
+  /* ====== Dashboard redesign (galeri kartu) — selaras dengan halaman Progress ====== */
+  .nd-shell {
+    --brand: ${brand_primary}; --brand-dark: ${brand_primary_dark};
+    --bg:#f4f6fb; --surface:#fff; --ink:#1a2233; --ink-soft:#5b6678; --ink-faint:#8a93a6;
+    --line:#e6eaf2; --brand-soft:#e8efff; --green:#16a34a; --green-soft:#e7f6ee;
+    --amber:#d97706; --amber-soft:#fdf0dd; --red:#dc2626; --purple:#7c3aed;
+    --shadow:0 1px 2px rgba(16,24,40,.04),0 8px 24px rgba(16,24,40,.06); --radius:16px;
+    background:var(--bg); color:var(--ink); min-height:calc(100vh - 80px);
+    font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
-  .blend-sidebar { position: sticky; top: 0; align-self: start; min-height: calc(100vh - 80px); padding: 20px 16px; border-right: 1px solid var(--blend-line); background: #fff; box-shadow: 1px 0 0 rgba(17,24,39,.02); }
-  .blend-sidebar-title { margin: 2px 6px 20px; color: #111827; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-  .blend-profile { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 10px; align-items: center; padding: 12px; margin-bottom: 18px; border: 1px solid var(--blend-line); border-radius: 8px; background: #f9fafb; }
-  .blend-profile img { width: 36px; height: 36px; border-radius: 50%; }
-  .blend-profile strong { display: block; overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
-  .blend-role { display: inline-block; width: max-content; margin-top: 4px; padding: 2px 7px; border-radius: 999px; background: #eef4ff; color: var(--blend-blue-dark); font-size: 10px; font-weight: 700; }
-  .blend-nav { display: grid; gap: 6px; }
-  .blend-nav a, .blend-settings { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 9px 11px; border-radius: 8px; color: #475467; font-size: 14px; font-weight: 500; text-decoration: none; transition: background .15s ease, color .15s ease, box-shadow .15s ease; }
-  .blend-nav a:hover, .blend-settings:hover { background: #f3f4f6; color: #111827; text-decoration: none; }
-  .blend-nav a.is-active { background: #eff6ff; color: var(--blend-blue-dark); box-shadow: inset 0 0 0 1px #bfdbfe; }
-  .blend-nav .fa, .blend-settings .fa { width: 16px; text-align: center; }
-  .blend-settings { position: absolute; bottom: 18px; left: 16px; right: 16px; }
-  .blend-main { padding: 28px 32px 52px; overflow: hidden; }
-  .blend-topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 26px; }
-  .blend-topbar h1 { margin: 0; color: #0f172a; font-size: 24px; font-weight: 700; letter-spacing: 0; }
-  .blend-icons { display: flex; align-items: center; gap: 10px; color: #475467; font-size: 13px; }
-  .blend-status-chip { position: relative; display: inline-flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 11px; border: 1px solid var(--blend-line); border-radius: 8px; background: #fff; color: #344054; font-weight: 700; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
-  .blend-status-chip .fa { color: var(--blend-blue-dark); }
-  .blend-status-chip small { color: var(--blend-muted); font-size: 12px; font-weight: 600; }
-  .blend-status-chip strong { color: #101828; font-size: 13px; font-weight: 800; }
-  .blend-notification-badge { position: absolute; top: -7px; right: -7px; min-width: 18px; height: 18px; padding: 0 5px; border: 2px solid #fff; border-radius: 999px; background: #ef4444; color: #fff; font-size: 10px; font-weight: 800; line-height: 14px; text-align: center; }
-  .blend-section-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0 0 14px; }
-  .blend-section-head h2, .blend-section-head h3 { margin: 0; color: #101828; font-size: 16px; font-weight: 700; }
-  .blend-link { color: #475467; font-size: 13px; font-weight: 600; text-decoration: none; }
-  .blend-link:hover { color: var(--blend-blue-dark); text-decoration: none; }
-  .blend-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 28px; }
-  .blend-stat { padding: 22px 20px; border: 1px solid var(--blend-line); border-radius: 8px; background: #fff; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
-  .blend-stat strong { display: block; color: #0f172a; font-size: 34px; line-height: 1; font-weight: 750; }
-  .blend-stat span { display: block; margin-top: 8px; color: var(--blend-muted); font-size: 13px; font-weight: 600; }
-  .blend-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, .78fr); gap: 18px; margin-bottom: 28px; }
-  .blend-panel, .blend-course-card, .blend-program { border: 1px solid var(--blend-line); border-radius: 8px; background: var(--blend-panel); box-shadow: 0 1px 2px rgba(16,24,40,.04); }
-  .blend-panel { padding: 18px; }
-  .blend-panel h3 { margin: 0 0 16px; color: #101828; font-size: 15px; font-weight: 700; }
-  .blend-task { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-top: 1px solid #f1f5f9; }
-  .blend-task:first-of-type { border-top: 0; }
-  .blend-check { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--blend-line-strong); border-radius: 50%; color: #fff; font-size: 12px; font-weight: 700; }
-  .blend-task.is-done .blend-check { border-color: var(--blend-success); background: var(--blend-success); }
-  .blend-check-cal { border-color: #bfdbfe; background: #eff6ff; color: var(--blend-blue-dark); font-size: 13px; }
-  .blend-task strong, .blend-event strong { display: block; margin-bottom: 4px; color: #111827; font-size: 14px; font-weight: 700; }
-  .blend-task p, .blend-event p, .blend-program p { margin: 0; color: var(--blend-muted); font-size: 12px; line-height: 1.5; }
-  .blend-event { margin-bottom: 12px; border: 1px solid var(--blend-line); border-radius: 8px; background: #fff; overflow: hidden; }
-  .blend-event-head { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; background: #f8fafc; border-bottom: 1px solid var(--blend-line); color: #344054; font-size: 13px; font-weight: 700; }
-  .blend-event-body { padding: 12px; }
-  .blend-activity { display: grid; grid-template-columns: 172px minmax(0, 1fr); gap: 16px; align-items: center; }
-  .blend-activity img, .blend-course-card img, .blend-program img { width: 100%; object-fit: cover; background: #eef2f6; }
-  .blend-activity img { height: 108px; border-radius: 6px; }
-  .blend-label { display: inline-block; margin-bottom: 8px; padding: 3px 7px; border-radius: 999px; background: #fef3c7; color: #92400e; font-size: 10px; font-weight: 800; letter-spacing: .04em; }
-  .blend-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 34px; padding: 8px 12px; border: 1px solid var(--blend-line-strong); border-radius: 8px; background: #fff; color: #344054; font-size: 13px; font-weight: 700; text-decoration: none; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
-  .blend-button:hover { border-color: #93c5fd; color: var(--blend-blue-dark); text-decoration: none; }
-  .blend-resume-btn { margin-top: 10px; border: 0; border-radius: 10px; background: #eff6ff; color: var(--blend-blue-dark); box-shadow: none; }
-  .blend-resume-btn:hover { border: 0; background: #dbeafe; color: var(--blend-blue-dark); }
-  .blend-resume-btn .fa { color: var(--blend-blue); }
-  .blend-activity + .blend-activity { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--blend-line); }
-  .blend-streak-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-  .blend-streak-summary > div { padding: 14px; border: 1px solid #eef2f7; border-radius: 8px; background: #f9fafb; }
-  .blend-streak-summary small { display: block; color: var(--blend-muted); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
-  .blend-streak-summary strong { display: block; margin-top: 4px; color: #101828; font-size: 24px; line-height: 1; }
-  .blend-status-list { list-style: none; margin: 0; padding: 0; }
-  .blend-status-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 0; border-top: 1px solid #f1f5f9; }
-  .blend-status-row:first-child { border-top: 0; }
-  .blend-status-info { min-width: 0; }
-  .blend-status-info strong { display: block; overflow: hidden; color: #111827; font-size: 14px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-  .blend-status-info span { display: block; margin-top: 2px; color: var(--blend-muted); font-size: 12px; }
-  .blend-status-tag { flex: none; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: .02em; white-space: nowrap; }
-  .blend-status-tag.is-done { background: #dcfce7; color: #166534; }
-  .blend-status-tag.is-progress { background: #dbeafe; color: #1e40af; }
-  .blend-status-tag.is-upcoming { background: #fef3c7; color: #92400e; }
-  .blend-status-tag.is-ended { background: #f1f5f9; color: #475467; }
-  .blend-courses { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 22px; margin-bottom: 28px; }
-  .blend-course-card { display: flex; flex-direction: column; height: 100%; border-radius: 14px; overflow: hidden; box-shadow: 0 1px 2px rgba(16,24,40,.04), 0 8px 20px rgba(16,24,40,.05); transition: transform .15s ease, box-shadow .15s ease; }
-  .blend-course-card:hover { transform: translateY(-4px); box-shadow: 0 18px 34px rgba(16,24,40,.13); }
-  .blend-course-thumb { position: relative; }
-  .blend-course-thumb img { display: block; width: 100%; height: 172px; object-fit: cover; background: #eef2f6; }
-  .blend-course-mode { position: absolute; top: 10px; left: 10px; padding: 3px 9px; border-radius: 999px; background: rgba(17,24,39,.78); color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .05em; }
-  .blend-course-chip { position: absolute; bottom: 10px; left: 10px; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.94); color: #344054; font-size: 11px; font-weight: 700; box-shadow: 0 1px 3px rgba(16,24,40,.18); }
-  .blend-course-chip .fa { font-size: 11px; color: var(--blend-blue-dark); }
-  .blend-course-chip.is-ready { background: #ecfdf3; color: #027a48; }
-  .blend-course-chip.is-ready .fa { color: #12b76a; }
-  .blend-course-body { display: flex; flex-direction: column; flex: 1; padding: 20px; }
-  .blend-course-card h3, .blend-program h3 { margin: 0; color: #101828; font-size: 16px; line-height: 1.35; font-weight: 750; }
-  .blend-course-card h3.blend-course-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 44px; }
-  .blend-course-meta { margin: 10px 0 16px; padding-bottom: 16px; border-bottom: 1px solid var(--blend-line); color: var(--blend-muted); font-size: 13px; line-height: 1.55; }
-  .blend-course-meta span { display: block; }
-  .blend-course-meta .blend-course-org { color: #475467; font-weight: 600; }
-  .blend-course-cta { display: flex; flex-direction: column; gap: 10px; margin-top: auto; }
-  .blend-course-open, .blend-cert-btn { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 44px; padding: 10px 14px; border: 0; border-radius: 10px; background: #eff6ff; color: var(--blend-blue-dark); font-size: 14px; font-weight: 700; text-decoration: none; box-shadow: none; }
-  .blend-course-open:hover, .blend-cert-btn:hover { background: #dbeafe; color: var(--blend-blue-dark); text-decoration: none; box-shadow: none; }
-  .blend-course-open .fa, .blend-cert-btn .fa { color: var(--blend-blue); }
-  .blend-unenroll-link { align-self: center; margin-top: 2px; color: #b42318; font-size: 12px; font-weight: 700; text-decoration: none; }
-  .blend-unenroll-link:hover { color: #991b1b; text-decoration: underline; }
-  .blend-managed-note { display: block; margin-top: 10px; color: var(--blend-muted); font-size: 12px; line-height: 1.4; }
-  .blend-program { display: grid; grid-template-columns: 230px minmax(0, 1fr) auto; gap: 22px; align-items: center; padding: 18px; margin-bottom: 18px; }
-  .blend-program img { height: 140px; border-radius: 6px; }
-  .blend-program-tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; }
-  .blend-program-tags span { padding: 4px 8px; border: 1px solid var(--blend-line); border-radius: 999px; background: #f9fafb; color: #475467; font-size: 11px; font-weight: 700; }
-  .blend-primary { border-color: var(--blend-blue); background: var(--blend-blue); color: #fff; }
-  .blend-primary:hover { border-color: var(--blend-blue-dark); background: var(--blend-blue-dark); color: #fff; }
-  .blend-empty { padding: 22px; border: 1px dashed #cbd5e1; border-radius: 8px; background: #f8fafc; color: var(--blend-muted); font-size: 13px; }
-  @media (max-width: 1180px) { .blend-courses { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  @media (max-width: 980px) { .blend-dashboard-shell { grid-template-columns: 1fr; } .blend-sidebar { position: relative; min-height: 0; border-right: 0; border-bottom: 1px solid var(--blend-line); } .blend-settings { position: static; margin-top: 14px; } .blend-grid, .blend-program { grid-template-columns: 1fr; } }
-  @media (max-width: 700px) { .blend-main { padding: 22px 16px 36px; } .blend-topbar, .blend-section-head { align-items: flex-start; flex-direction: column; } .blend-stats, .blend-courses, .blend-streak-summary { grid-template-columns: 1fr; } .blend-activity { grid-template-columns: 1fr; } }
+  .nd-shell *{ box-sizing:border-box; }
+  .nd-shell a{ color:var(--brand); text-decoration:none; } .nd-shell a:hover{ text-decoration:none; }
+
+  /* top nav bar */
+  .nd-topbar{ background:var(--surface); border-bottom:1px solid var(--line); padding:12px 24px;
+    display:flex; align-items:center; gap:16px; position:sticky; top:0; z-index:9; flex-wrap:wrap; }
+  .nd-brand{ display:flex; align-items:center; gap:11px; }
+  .nd-brand-dot{ width:34px; height:34px; border-radius:9px; background:linear-gradient(135deg,var(--brand),var(--purple));
+    display:grid; place-items:center; color:#fff; font-weight:800; }
+  .nd-brand-title{ font-size:14.5px; font-weight:700; }
+  .nd-brand-sub{ font-size:11.5px; color:var(--ink-faint); }
+  .nd-nav{ margin-left:8px; display:flex; gap:4px; flex-wrap:wrap; }
+  .nd-nav a{ padding:8px 13px; border-radius:9px; font-size:13.5px; color:var(--ink-soft); font-weight:600; }
+  .nd-nav a:hover{ background:#f0f3fa; color:var(--ink); }
+  .nd-nav a.is-active{ background:var(--brand-soft); color:var(--brand); }
+  .nd-nav .fa{ margin-right:6px; }
+  .nd-top-right{ margin-left:auto; display:flex; align-items:center; gap:12px; }
+  .nd-settings{ color:var(--ink-soft); font-size:13px; font-weight:600; }
+  .nd-settings:hover{ color:var(--ink); }
+  .nd-top-avatar{ width:30px; height:30px; border-radius:50%; object-fit:cover; border:1px solid var(--line); }
+  /* account dropdown (native <details>, no JS) */
+  .nd-acct{ position:relative; }
+  .nd-acct > summary{ list-style:none; cursor:pointer; display:flex; align-items:center; gap:8px; padding:4px 10px 4px 4px; border:1px solid var(--line); border-radius:999px; font-size:13px; font-weight:600; color:var(--ink-soft); background:var(--surface); }
+  .nd-acct > summary::-webkit-details-marker{ display:none; }
+  .nd-acct > summary:hover, .nd-acct[open] > summary{ background:#f0f3fa; color:var(--ink); }
+  .nd-acct-menu{ position:absolute; right:0; top:calc(100% + 8px); min-width:212px; background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 8px 24px rgba(16,24,40,.12); padding:6px; z-index:30; }
+  .nd-acct-name{ padding:8px 12px 10px; border-bottom:1px solid var(--line); margin-bottom:4px; }
+  .nd-acct-name strong{ display:block; font-size:13.5px; } .nd-acct-name span{ font-size:11.5px; color:var(--ink-faint); }
+  .nd-acct-menu a{ display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:8px; font-size:13.5px; color:var(--ink); font-weight:500; }
+  .nd-acct-menu a:hover{ background:#f4f6fb; color:var(--ink); }
+  .nd-acct-menu a .fa{ width:16px; text-align:center; color:var(--ink-faint); }
+  .nd-acct-menu a.danger{ color:var(--red); } .nd-acct-menu a.danger .fa{ color:var(--red); }
+
+  .nd-wrap{ max-width:1180px; margin:0 auto; padding:26px 24px 60px; }
+
+  /* greeting */
+  .nd-head{ display:flex; align-items:center; gap:16px; margin-bottom:22px; flex-wrap:wrap; }
+  .nd-avatar{ width:54px; height:54px; border-radius:50%; object-fit:cover; flex:none; border:1px solid var(--line); background:#eef2f6; }
+  .nd-greet{ font-size:22px; font-weight:800; margin:0; }
+  .nd-date{ font-size:13px; color:var(--ink-faint); margin-top:2px; }
+  .nd-chips{ margin-left:auto; display:flex; gap:10px; flex-wrap:wrap; }
+  .nd-chip{ position:relative; display:inline-flex; align-items:center; gap:8px; padding:8px 13px; border:1px solid var(--line);
+    border-radius:10px; background:var(--surface); box-shadow:var(--shadow); font-size:13px; }
+  .nd-chip .fa{ color:var(--brand); } .nd-chip strong{ font-weight:800; } .nd-chip small{ color:var(--ink-faint); font-weight:600; }
+  .nd-badge{ position:absolute; top:-7px; right:-7px; min-width:18px; height:18px; padding:0 5px; border:2px solid #fff; border-radius:999px;
+    background:var(--red); color:#fff; font-size:10px; font-weight:800; line-height:14px; text-align:center; }
+
+  /* HERO continue learning */
+  .nd-hero{ background:linear-gradient(135deg,#1e293b,#312e81); color:#fff; border-radius:var(--radius); box-shadow:var(--shadow);
+    padding:24px; position:relative; overflow:hidden; margin-bottom:24px; display:flex; gap:24px; align-items:center; }
+  .nd-hero::after{ content:""; position:absolute; right:-50px; top:-50px; width:210px; height:210px; border-radius:50%; background:rgba(255,255,255,.06);}
+  .nd-hero-thumb{ width:196px; height:116px; border-radius:14px; flex:none; overflow:hidden; box-shadow:0 8px 20px rgba(0,0,0,.25); z-index:1; background:#0b1220; }
+  .nd-hero-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .nd-hero-body{ flex:1; min-width:0; z-index:1; }
+  .nd-hero-label{ font-size:12px; letter-spacing:.04em; text-transform:uppercase; color:rgba(255,255,255,.65); font-weight:700; }
+  .nd-hero-title{ font-size:21px; font-weight:800; margin:4px 0 2px; }
+  .nd-hero-sub{ font-size:13px; color:rgba(255,255,255,.8); margin-bottom:16px; }
+  @media (max-width:720px){ .nd-hero{ flex-direction:column; align-items:flex-start; } .nd-hero-thumb{ width:100%; height:150px; } }
+
+  /* buttons */
+  .nd-btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px; background:var(--brand); color:#fff; border:0; cursor:pointer;
+    padding:10px 18px; border-radius:10px; font-size:13.5px; font-weight:700; text-decoration:none; }
+  .nd-btn:hover{ filter:brightness(1.05); color:#fff; text-decoration:none; }
+  .nd-btn.ghost{ background:var(--surface); color:var(--ink); border:1px solid var(--line); }
+  .nd-btn.white{ background:#fff; color:#1e293b; } .nd-btn.white:hover{ background:#eef2f9; color:#1e293b; }
+  .nd-btn.sm{ padding:9px 14px; font-size:13px; width:100%; }
+  /* === Tombol kebal override: aturan a:link/a:visited inti (0,1,1) mengalahkan .nd-btn (0,1,0)
+        sehingga teks "Open course" jadi samar. Paksa warna per-state dgn spesifisitas tinggi + !important. === */
+  .nd-shell a.nd-btn,
+  .nd-shell a.nd-btn:link,
+  .nd-shell a.nd-btn:visited,
+  .nd-shell a.nd-btn:hover,
+  .nd-shell a.nd-btn:active,
+  .nd-shell a.nd-btn:focus{ color:#ffffff !important; -webkit-text-fill-color:#ffffff; opacity:1 !important; text-shadow:none !important; text-decoration:none !important; }
+  .nd-shell a.nd-btn .fa{ color:#ffffff !important; -webkit-text-fill-color:#ffffff; }
+  /* varian putih (hero "Resume") — teks gelap di atas tombol putih */
+  .nd-shell a.nd-btn.white,
+  .nd-shell a.nd-btn.white:link,
+  .nd-shell a.nd-btn.white:visited,
+  .nd-shell a.nd-btn.white:hover,
+  .nd-shell a.nd-btn.white:active,
+  .nd-shell a.nd-btn.white:focus{ color:#1e293b !important; -webkit-text-fill-color:#1e293b; }
+  .nd-shell a.nd-btn.white .fa{ color:#1e293b !important; -webkit-text-fill-color:#1e293b; }
+  /* varian ghost — teks tinta di atas latar putih */
+  .nd-shell a.nd-btn.ghost,
+  .nd-shell a.nd-btn.ghost:link,
+  .nd-shell a.nd-btn.ghost:visited,
+  .nd-shell a.nd-btn.ghost:hover,
+  .nd-shell a.nd-btn.ghost:focus{ color:var(--ink) !important; -webkit-text-fill-color:var(--ink); }
+  .nd-shell a.nd-btn.ghost .fa{ color:var(--ink) !important; -webkit-text-fill-color:var(--ink); }
+  /* varian sertifikat — teks hijau di atas hijau lembut (urutan SETELAH general agar menang) */
+  .nd-shell a.nd-cert-btn,
+  .nd-shell a.nd-cert-btn:link,
+  .nd-shell a.nd-cert-btn:visited,
+  .nd-shell a.nd-cert-btn:hover,
+  .nd-shell a.nd-cert-btn:focus{ color:var(--green) !important; -webkit-text-fill-color:var(--green); background:var(--green-soft) !important; }
+  .nd-shell a.nd-cert-btn .fa{ color:var(--green) !important; -webkit-text-fill-color:var(--green); }
+
+  /* section heading */
+  .nd-sec{ display:flex; align-items:center; justify-content:space-between; gap:14px; margin:0 2px 14px; }
+  .nd-sec h2{ font-size:18px; margin:0; } .nd-sec .more{ font-size:13px; font-weight:600; color:var(--ink-soft); }
+  .nd-sec .more:hover{ color:var(--brand); }
+
+  /* stat cards */
+  .nd-stats{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:26px; }
+  .nd-stat{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:18px 20px; box-shadow:var(--shadow); }
+  .nd-stat .ic{ width:36px; height:36px; border-radius:10px; display:grid; place-items:center; font-size:16px; margin-bottom:10px; background:var(--brand-soft); color:var(--brand); }
+  .nd-stat .ic.g{ background:var(--green-soft); color:var(--green);} .nd-stat .ic.p{ background:#f1eafe; color:var(--purple);}
+  .nd-stat .big{ font-size:30px; font-weight:800; line-height:1; } .nd-stat .cap{ font-size:13px; color:var(--ink-faint); margin-top:8px; }
+
+  /* generic panels */
+  .nd-grid3{ display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-bottom:28px; align-items:start; }
+  @media (max-width:980px){ .nd-grid3{ grid-template-columns:1fr; } }
+  .nd-panel{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:20px; }
+  .nd-panel-h{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .nd-panel-h h3{ font-size:13px; letter-spacing:.03em; text-transform:uppercase; color:var(--ink-faint); margin:0; font-weight:700; }
+  .nd-panel-h .more{ font-size:12px; font-weight:600; color:var(--ink-soft); }
+
+  .nd-row{ display:flex; align-items:center; gap:12px; padding:11px 0; border-top:1px solid var(--line); }
+  .nd-row:first-of-type{ border-top:0; padding-top:0; } .nd-row:last-child{ padding-bottom:0; }
+  .nd-row-ic{ width:38px; height:38px; border-radius:10px; flex:none; display:grid; place-items:center; font-size:15px; background:var(--brand-soft); color:var(--brand); }
+  .nd-row-ic.amber{ background:var(--amber-soft); color:var(--amber);} .nd-row-ic.green{ background:var(--green-soft); color:var(--green);}
+  .nd-row .t{ font-size:13.5px; font-weight:700; } .nd-row .s{ font-size:11.5px; color:var(--ink-faint); }
+  .nd-row .when{ margin-left:auto; font-size:11.5px; color:var(--ink-faint); white-space:nowrap; text-align:right; }
+  .nd-tag{ flex:none; margin-left:auto; padding:4px 11px; border-radius:999px; font-size:11px; font-weight:800; white-space:nowrap; }
+  .nd-tag.is-done{ background:var(--green-soft); color:var(--green);} .nd-tag.is-progress{ background:var(--brand-soft); color:var(--brand);}
+  .nd-tag.is-upcoming{ background:var(--amber-soft); color:var(--amber);} .nd-tag.is-ended{ background:#f0f3fa; color:var(--ink-soft);}
+  .nd-empty{ font-size:12.5px; color:var(--ink-faint); text-align:center; padding:16px 4px; }
+
+  /* MY COURSES gallery */
+  .nd-gallery{ display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-bottom:30px; }
+  @media (max-width:1024px){ .nd-gallery{ grid-template-columns:repeat(2,1fr);} }
+  @media (max-width:620px){ .nd-gallery{ grid-template-columns:1fr;} .nd-stats{ grid-template-columns:1fr;} }
+  .nd-ccard{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow);
+    overflow:hidden; display:flex; flex-direction:column; transition:transform .15s, box-shadow .15s; }
+  .nd-ccard:hover{ transform:translateY(-3px); box-shadow:0 6px 14px rgba(16,24,40,.08),0 16px 40px rgba(16,24,40,.1); }
+  .nd-ccard-thumb{ height:132px; position:relative; background:#e6eaf2; overflow:hidden; }
+  .nd-ccard-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .nd-ccard-thumb::before{ content:""; position:absolute; inset:0; background:linear-gradient(180deg,rgba(0,0,0,.04),rgba(0,0,0,.30)); }
+  .nd-ccard-badges{ position:absolute; left:12px; top:12px; display:flex; gap:6px; flex-wrap:wrap; z-index:1; }
+  .nd-badge2{ font-size:10.5px; font-weight:800; padding:3px 9px; border-radius:999px; text-transform:uppercase; letter-spacing:.03em;
+    background:rgba(255,255,255,.92); color:var(--ink); }
+  .nd-badge2.ready{ background:var(--green); color:#fff; }
+  .nd-ccard-body{ padding:16px 18px 18px; display:flex; flex-direction:column; flex:1; }
+  .nd-ccard-title{ font-size:15.5px; font-weight:800; margin:0 0 4px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .nd-ccard-meta{ font-size:12px; color:var(--ink-faint); margin-bottom:14px; line-height:1.5; }
+  .nd-ccard-meta .org{ color:var(--ink-soft); font-weight:600; display:block; }
+  .nd-ccard-cta{ display:flex; flex-direction:column; gap:9px; margin-top:auto; }
+  .nd-cert-btn{ background:var(--green-soft); color:var(--green); }
+  .nd-cert-btn:hover{ background:#d6f0e0; color:var(--green); }
+  .nd-unenroll{ align-self:center; color:#b42318; font-size:12px; font-weight:700; }
+  .nd-unenroll:hover{ color:#991b1b; text-decoration:underline; }
+  .nd-managed{ display:block; margin-top:6px; color:var(--ink-faint); font-size:11.5px; line-height:1.4; text-align:center; }
+
+  /* related programs */
+  .nd-program{ display:grid; grid-template-columns:200px 1fr auto; gap:20px; align-items:center;
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:18px; margin-bottom:16px; }
+  .nd-program img{ width:100%; height:120px; object-fit:cover; border-radius:12px; background:#eef2f6; }
+  .nd-program h3{ margin:0 0 4px; font-size:16px; font-weight:800; }
+  .nd-program p{ margin:0; color:var(--ink-soft); font-size:13px; }
+  .nd-program-tags{ display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 16px; }
+  .nd-program-tags span{ padding:4px 10px; border:1px solid var(--line); border-radius:999px; background:#f9fafb; color:var(--ink-soft); font-size:11px; font-weight:700; }
+  .nd-active{ color:var(--green); font-weight:800; font-size:13px; }
+  @media (max-width:760px){ .nd-program{ grid-template-columns:1fr; } .nd-program img{ height:160px; } }
+
+  .nd-banner{ max-width:1180px; margin:0 auto; padding:0 24px; }
 </style>
 </%block>
 
@@ -242,7 +302,7 @@ from django.db.models import Max
   % endif
 </%block>
 
-<div class="dashboard-notifications" tabindex="-1">
+<div class="dashboard-notifications nd-banner" tabindex="-1">
 
     %if banner_account_activation_message:
         <div class="dashboard-banner">
@@ -353,192 +413,119 @@ from django.db.models import Max
       greeting = _('Good evening')
     else:
       greeting = _('Good night')
+    ## Pilih course untuk hero "Continue learning".
+    if continue_courses:
+      hero_enr, hero_url = continue_courses[0]
+      hero_overview = hero_enr.course_overview
+      hero_action = _('Resume')
+    elif first_course_overview:
+      hero_enr, hero_url, hero_overview, hero_action = first_course, first_resume_url, first_course_overview, _('Start course')
+    else:
+      hero_enr = hero_url = hero_overview = hero_action = None
+    ## URL menu akun (dipindah dari header global ke nd-topbar)
+    order_history_url = context.get('order_history_url', '')
+    try:
+      profile_url = reverse('learner_profile', kwargs={'username': user.username})
+    except Exception:
+      profile_url = '/u/{}'.format(user.username)
   %>
-  <div class="blend-dashboard-shell" id="dashboard-main">
-    <aside class="blend-sidebar" aria-label="${_('Learner navigation')}">
-      <div class="blend-sidebar-title">${_('Learning Portal')}</div>
-      <div class="blend-profile">
-        <img src="${profile_image_url or static.url('images/profiles/default_30.png')}" alt="" />
-        <strong>${learner_name}</strong>
-        <span class="blend-role">${_('Student')}</span>
+  <div class="nd-shell" id="dashboard-main">
+
+    <header class="nd-topbar">
+      <div class="nd-brand">
+        <span class="nd-brand-dot">${(settings.PLATFORM_NAME or 'P')[:1].upper()}</span>
+        <div>
+          <div class="nd-brand-title">${_('Learning Portal')}</div>
+          <div class="nd-brand-sub">${_('Student Home')}</div>
+        </div>
       </div>
-      <nav class="blend-nav" aria-label="${_('Dashboard sections')}">
+      <nav class="nd-nav" aria-label="${_('Dashboard sections')}">
         <a class="is-active" href="${reverse('dashboard')}"><span class="fa fa-home" aria-hidden="true"></span>${_('Home')}</a>
         <a href="${marketing_link('COURSES')}"><span class="fa fa-search" aria-hidden="true"></span>${_('Discover')}</a>
-        <a href="#recommended-courses"><span class="fa fa-lightbulb-o" aria-hidden="true"></span>${_('My Courses')}</a>
+        <a href="#recommended-courses"><span class="fa fa-graduation-cap" aria-hidden="true"></span>${_('My Courses')}</a>
         <a href="#course-status"><span class="fa fa-compass" aria-hidden="true"></span>${_('Progress')}</a>
         <a href="#upcoming-events"><span class="fa fa-calendar" aria-hidden="true"></span>${_('Upcoming')}</a>
         <a href="#updates"><span class="fa fa-commenting-o" aria-hidden="true"></span>${_('Updates')}</a>
       </nav>
-      <a class="blend-settings" href="${reverse('account_settings')}"><span class="fa fa-cog" aria-hidden="true"></span>${_('Settings')}</a>
-    </aside>
+      <div class="nd-top-right">
+        <a class="nd-settings" href="${marketing_link('COURSES')}"><span class="fa fa-question-circle" aria-hidden="true"></span> ${_('Help')}</a>
+        <details class="nd-acct">
+          <summary>
+            <img class="nd-top-avatar" src="${profile_image_url or static.url('images/profiles/default_30.png')}" alt="" />
+            <span>${learner_name}</span>
+            <span class="fa fa-caret-down" aria-hidden="true"></span>
+          </summary>
+          <div class="nd-acct-menu" role="menu">
+            <div class="nd-acct-name"><strong>${learner_name}</strong><span>${user.email}</span></div>
+            <a role="menuitem" href="${reverse('dashboard')}"><span class="fa fa-home" aria-hidden="true"></span>${_('Dashboard')}</a>
+            <a role="menuitem" href="${profile_url}"><span class="fa fa-user" aria-hidden="true"></span>${_('Profile')}</a>
+            <a role="menuitem" href="${reverse('account_settings')}"><span class="fa fa-cog" aria-hidden="true"></span>${_('Account')}</a>
+            % if order_history_url:
+              <a role="menuitem" href="${order_history_url}"><span class="fa fa-shopping-cart" aria-hidden="true"></span>${_('Order History')}</a>
+            % endif
+            <a role="menuitem" class="danger" href="${reverse('logout')}"><span class="fa fa-sign-out" aria-hidden="true"></span>${_('Sign Out')}</a>
+          </div>
+        </details>
+      </div>
+    </header>
 
-    <section class="blend-main">
-      <div class="blend-topbar">
-        <h1>${greeting}, ${learner_name}</h1>
-        <div class="blend-icons" aria-label="Learner status">
-          <span class="blend-status-chip"><span class="fa fa-book" aria-hidden="true"></span><strong>${total_courses}</strong><small>${_('Courses')}</small></span>
-          <span class="blend-status-chip">
+    <div class="nd-wrap">
+
+      <!-- greeting -->
+      <div class="nd-head">
+        <img class="nd-avatar" src="${profile_image_url or static.url('images/profiles/default_30.png')}" alt="" />
+        <div>
+          <h1 class="nd-greet">${greeting}, ${learner_name}</h1>
+          <div class="nd-date">${_('Welcome back — keep learning today')}</div>
+        </div>
+        <div class="nd-chips" aria-label="Learner status">
+          <span class="nd-chip"><span class="fa fa-book" aria-hidden="true"></span><strong>${total_courses}</strong><small>${_('Courses')}</small></span>
+          <span class="nd-chip">
             <span class="fa fa-certificate" aria-hidden="true"></span><strong>${len(completed_courses)}</strong><small>${_('Certificates')}</small>
             % if len(completed_courses) > 0:
-              <span class="blend-notification-badge" aria-label="${_('Certificate notifications')}">${len(completed_courses)}</span>
+              <span class="nd-badge" aria-label="${_('Certificate notifications')}">${len(completed_courses)}</span>
             % endif
           </span>
-          <span class="blend-status-chip">
+          <span class="nd-chip">
             <span class="fa fa-check-circle" aria-hidden="true"></span><strong>${len(verified_courses)}</strong><small>${_('Verification')}</small>
             % if len(verified_courses) > 0:
-              <span class="blend-notification-badge" aria-label="${_('Verification notifications')}">${len(verified_courses)}</span>
+              <span class="nd-badge" aria-label="${_('Verification notifications')}">${len(verified_courses)}</span>
             % endif
           </span>
         </div>
       </div>
 
-      <div class="blend-section-head">
+      <!-- HERO: Continue learning -->
+      % if hero_overview:
+        <div class="nd-hero">
+          <div class="nd-hero-thumb"><img src="${hero_overview.image_urls['small']}" alt="" /></div>
+          <div class="nd-hero-body">
+            <div class="nd-hero-label">${_('Continue learning')}</div>
+            <div class="nd-hero-title">${hero_overview.display_name_with_default}</div>
+            <div class="nd-hero-sub">${hero_overview.display_org_with_default} &middot; ${hero_overview.display_number_with_default}</div>
+            <a class="nd-btn white" href="${hero_url or course_home_url(hero_overview.id)}"><span class="fa fa-play" aria-hidden="true"></span>${hero_action} &rarr;</a>
+          </div>
+        </div>
+      % endif
+
+      <!-- You Have (stats) -->
+      <div class="nd-sec">
         <h2>${_('You Have')}</h2>
-        <a class="blend-link" href="#course-status">${_('See Progress')}</a>
+        <a class="more" href="#course-status">${_('See Progress')} &rarr;</a>
       </div>
-      <div class="blend-stats" role="list" aria-label="Learning summary">
-        <div class="blend-stat" role="listitem"><strong>${total_courses}</strong><span>${_('Enrolled courses')}</span></div>
-        <div class="blend-stat" role="listitem"><strong>${len(completed_courses)}</strong><span>${_('Certificates ready')}</span></div>
-        <div class="blend-stat" role="listitem"><strong>${total_entitlements}</strong><span>${_('Program entitlements')}</span></div>
-      </div>
-
-      <div class="blend-section-head">
-        <h2>${_('Updates')}</h2>
-        % if show_load_all_courses_link:
-          <a class="blend-button" href="${reverse('dashboard')}?course_limit=None"><span class="fa fa-list" aria-hidden="true"></span>${_('Load all courses')}</a>
-        % endif
-      </div>
-      <div class="blend-grid" id="updates">
-        <section class="blend-panel" aria-labelledby="platform-updates-title">
-          <h3 id="platform-updates-title">${_('Course schedule')}</h3>
-          % if recent_courses:
-            % for enrollment in recent_courses:
-              <%
-                course_overview = enrollment.course_overview
-                if course_overview.has_ended():
-                    sched_label = _('Ended'); sched_date = course_overview.end
-                elif not course_overview.has_started():
-                    sched_label = _('Starts'); sched_date = course_overview.start
-                elif course_overview.end:
-                    sched_label = _('Ends'); sched_date = course_overview.end
-                else:
-                    sched_label = _('Started'); sched_date = course_overview.start
-              %>
-              <div class="blend-task">
-                <span class="blend-check blend-check-cal"><span class="fa fa-calendar-o" aria-hidden="true"></span></span>
-                <div>
-                  <strong>${course_overview.display_name_with_default}</strong>
-                  <p>
-                    ${course_overview.display_org_with_default} - ${course_overview.display_number_with_default}
-                    % if sched_date:
-                      <br>${sched_label}: <span class="localized-datetime" data-language="${user_language}" data-timezone="${user_timezone}" data-datetime="${sched_date.strftime('%Y-%m-%dT%H:%M:%S%z')}" data-format="shortDate" data-string="{date}"></span>
-                    % else:
-                      <br>${_('No scheduled dates')}
-                    % endif
-                  </p>
-                </div>
-              </div>
-            % endfor
-          % else:
-            <div class="blend-empty">
-              % if display_dashboard_courses:
-                ${_('You are not enrolled in any courses yet.')}
-              % else:
-                ${activate_account_message | n, decode.utf8}
-              % endif
-            </div>
-          % endif
-        </section>
-
-        <section class="blend-panel" id="upcoming-events" aria-labelledby="events-title">
-          <div class="blend-section-head"><h3 id="events-title">${_('Upcoming course starts')}</h3><a class="blend-link" href="${marketing_link('COURSES')}">${_('Discover')}</a></div>
-          % if upcoming_courses:
-            % for enrollment in upcoming_courses:
-              <% course_overview = enrollment.course_overview %>
-              <article class="blend-event">
-                <div class="blend-event-head">
-                  <span><span class="fa fa-calendar-o" aria-hidden="true"></span> <span class="localized-datetime" data-language="${user_language}" data-timezone="${user_timezone}" data-datetime="${course_overview.start.strftime('%Y-%m-%dT%H:%M:%S%z')}" data-format="shortDate" data-string="{date}"></span></span>
-                  <span>${course_overview.display_org_with_default}</span>
-                </div>
-                <div class="blend-event-body"><strong>${course_overview.display_name_with_default}</strong><p>${course_overview.display_number_with_default}</p></div>
-              </article>
-            % endfor
-          % else:
-            <div class="blend-empty">${_('No upcoming course start dates are available.')}</div>
-          % endif
-        </section>
+      <div class="nd-stats" role="list" aria-label="Learning summary">
+        <div class="nd-stat" role="listitem"><div class="ic">&#128218;</div><div class="big">${total_courses}</div><div class="cap">${_('Enrolled courses')}</div></div>
+        <div class="nd-stat" role="listitem"><div class="ic g">&#127891;</div><div class="big">${len(completed_courses)}</div><div class="cap">${_('Certificates ready')}</div></div>
+        <div class="nd-stat" role="listitem"><div class="ic p">&#128451;</div><div class="big">${total_entitlements}</div><div class="cap">${_('Program entitlements')}</div></div>
       </div>
 
-      <div class="blend-grid">
-        <section class="blend-panel" aria-labelledby="activity-title">
-          <div class="blend-section-head"><h3 id="activity-title">${_('Continue learning')}</h3><a class="blend-link" href="#recommended-courses">${_('See courses')}</a></div>
-          % if continue_courses:
-            % for _enr, _url in continue_courses:
-              <% co = _enr.course_overview %>
-              <div class="blend-activity">
-                <img src="${co.image_urls['small']}" alt="" />
-                <div>
-                  <span class="blend-label">${_enr.mode.upper()}</span>
-                  <strong>${co.display_name_with_default}</strong>
-                  <div class="blend-course-meta">${co.display_org_with_default} - ${co.display_number_with_default}</div>
-                  <a class="blend-button blend-resume-btn" href="${_url or course_home_url(co.id)}"><span class="fa fa-play" aria-hidden="true"></span>${_('Resume')}</a>
-                </div>
-              </div>
-            % endfor
-          % elif first_course_overview:
-            <div class="blend-activity">
-              <img src="${first_course_overview.image_urls['small']}" alt="" />
-              <div>
-                <span class="blend-label">${first_course.mode.upper()}</span>
-                <strong>${first_course_overview.display_name_with_default}</strong>
-                <div class="blend-course-meta">${first_course_overview.display_org_with_default} - ${first_course_overview.display_number_with_default}</div>
-                <a class="blend-button blend-resume-btn" href="${first_resume_url or course_home_url(first_course_overview.id)}"><span class="fa fa-play" aria-hidden="true"></span>${_('Start course')}</a>
-              </div>
-            </div>
-          % else:
-            <div class="blend-empty">${_('You have no courses to continue yet.')}</div>
-          % endif
-        </section>
-
-        <section class="blend-panel" id="course-status" aria-labelledby="status-title">
-          <div class="blend-section-head"><h3 id="status-title">${_('Learning status')}</h3><a class="blend-link" href="#recommended-courses">${_('See courses')}</a></div>
-          % if active_courses:
-            <ul class="blend-status-list">
-            % for enrollment in active_courses:
-              <%
-                co = enrollment.course_overview
-                cs = cert_statuses.get(enrollment.course_id, {})
-                if cs.get('status') == 'downloadable':
-                    st_label = _('Completed'); st_cls = 'is-done'
-                elif co.has_ended():
-                    st_label = _('Ended'); st_cls = 'is-ended'
-                elif not co.has_started():
-                    st_label = _('Not started'); st_cls = 'is-upcoming'
-                else:
-                    st_label = _('In progress'); st_cls = 'is-progress'
-              %>
-              <li class="blend-status-row">
-                <div class="blend-status-info">
-                  <strong>${co.display_name_with_default}</strong>
-                  <span>${co.display_org_with_default} - ${co.display_number_with_default}</span>
-                </div>
-                <span class="blend-status-tag ${st_cls}">${st_label}</span>
-              </li>
-            % endfor
-            </ul>
-          % else:
-            <div class="blend-empty">${_('You are not enrolled in any courses yet.')}</div>
-          % endif
-        </section>
-      </div>
-
-      <div class="blend-section-head" id="recommended-courses">
+      <!-- My Courses gallery -->
+      <div class="nd-sec" id="recommended-courses">
         <h2>${_('My Courses')}</h2>
-        <a class="blend-link" href="${marketing_link('COURSES')}">${_('Explore courses')}</a>
+        <a class="more" href="${marketing_link('COURSES')}">${_('Explore courses')} &rarr;</a>
       </div>
       % if active_courses:
-        <div class="blend-courses">
+        <div class="nd-gallery">
           % for dashboard_index, enrollment in enumerate(active_courses):
             <%
               course_overview = enrollment.course_overview
@@ -554,43 +541,34 @@ from django.db.models import Max
               cert_is_ready = bool(cert_status and cert_status.get('status') == 'downloadable')
               cert_view_url = cert_status.get('cert_web_view_url') if cert_status else None
               cert_dl_url = cert_status.get('download_url') if cert_status else None
-              foot_label = _('Certificate ready') if cert_is_ready else (cert_status.get('status') if cert_status else _('In progress'))
             %>
-            <article class="blend-course-card">
-              <div class="blend-course-thumb">
-                <img src="${course_overview.image_urls['small']}" alt="" />
-                <span class="blend-course-mode">${enrollment.mode.upper()}</span>
-                <span class="blend-course-chip ${'is-ready' if cert_is_ready else ''}">
+            <article class="nd-ccard">
+              <div class="nd-ccard-thumb">
+                <div class="nd-ccard-badges">
+                  <span class="nd-badge2">${enrollment.mode.upper()}</span>
                   % if cert_is_ready:
-                    <span class="fa fa-certificate" aria-hidden="true"></span>${_('Certificate ready')}
-                  % else:
-                    <span class="fa fa-book" aria-hidden="true"></span>${foot_label}
+                    <span class="nd-badge2 ready">${_('Certificate ready')}</span>
                   % endif
-                </span>
+                </div>
+                <img src="${course_overview.image_urls['small']}" alt="" />
               </div>
-              <div class="blend-course-body">
-                <h3 class="blend-course-title">${course_overview.display_name_with_default}</h3>
-                <div class="blend-course-meta">
-                  <span class="blend-course-org">${course_overview.display_org_with_default} &middot; ${course_overview.display_number_with_default}</span>
+              <div class="nd-ccard-body">
+                <h3 class="nd-ccard-title">${course_overview.display_name_with_default}</h3>
+                <div class="nd-ccard-meta">
+                  <span class="org">${course_overview.display_org_with_default} &middot; ${course_overview.display_number_with_default}</span>
                   % if enrollment.created:
                     <span class="localized-datetime" data-language="${user_language}" data-timezone="${user_timezone}" data-datetime="${enrollment.created.strftime('%Y-%m-%dT%H:%M:%S%z')}" data-format="shortDate" data-string="${_('Enrolled: {date}')}"></span>
                   % endif
                 </div>
-                <div class="blend-course-cta">
+                <div class="nd-ccard-cta">
                   % if cert_is_ready and cert_view_url:
-                    <a class="blend-cert-btn" href="${cert_view_url}" target="_blank" rel="noopener">
-                      <span class="fa fa-trophy" aria-hidden="true"></span>${_('View Certificate')}
-                    </a>
+                    <a class="nd-btn sm nd-cert-btn" href="${cert_view_url}" target="_blank" rel="noopener"><span class="fa fa-trophy" aria-hidden="true"></span>${_('View Certificate')}</a>
                   % elif cert_is_ready and cert_dl_url:
-                    <a class="blend-cert-btn" href="${cert_dl_url}" target="_blank" rel="noopener">
-                      <span class="fa fa-trophy" aria-hidden="true"></span>${_('Download Certificate')}
-                    </a>
+                    <a class="nd-btn sm nd-cert-btn" href="${cert_dl_url}" target="_blank" rel="noopener"><span class="fa fa-trophy" aria-hidden="true"></span>${_('Download Certificate')}</a>
                   % endif
-                  <a class="blend-course-open" href="${resume_url or course_home_url(course_overview.id)}">
-                    <span class="fa fa-play-circle" aria-hidden="true"></span>${_('Open course')}
-                  </a>
+                  <a class="nd-btn sm" href="${resume_url or course_home_url(course_overview.id)}"><span class="fa fa-play-circle" aria-hidden="true"></span>${_('Open course')}</a>
                   % if can_unenroll:
-                    <a href="#unenroll-modal" class="blend-unenroll-link action action-unenroll" rel="leanModal"
+                    <a href="#unenroll-modal" class="nd-unenroll action action-unenroll" rel="leanModal"
                       data-course-id="${course_overview.id}"
                       data-course-number="${course_overview.number}"
                       data-course-name="${course_overview.display_name_with_default}"
@@ -601,7 +579,7 @@ from django.db.models import Max
                       data-course-cert-name-long="${course_cert_name_long}"
                       data-course-enrollment-mode="${enrollment.mode}">${_('Unenroll')}</a>
                   % elif partner_managed_enrollment:
-                    <span class="blend-managed-note">${_('You are enrolled by your institution and should contact your institution to drop this course.')}</span>
+                    <span class="nd-managed">${_('You are enrolled by your institution and should contact your institution to drop this course.')}</span>
                   % endif
                 </div>
               </div>
@@ -609,31 +587,134 @@ from django.db.models import Max
           % endfor
         </div>
       % else:
-        <div class="blend-empty">${_('You are not enrolled in any courses yet.')}</div>
+        <div class="nd-empty">${_('You are not enrolled in any courses yet.')}</div>
       % endif
 
-      <div class="blend-section-head">
+      <!-- Updates: schedule / upcoming / learning status -->
+      <div class="nd-sec" id="updates">
+        <h2>${_('Updates')}</h2>
+        % if show_load_all_courses_link:
+          <a class="more" href="${reverse('dashboard')}?course_limit=None">${_('Load all courses')} &rarr;</a>
+        % endif
+      </div>
+      <div class="nd-grid3">
+
+        <section class="nd-panel" aria-labelledby="platform-updates-title">
+          <div class="nd-panel-h"><h3 id="platform-updates-title">${_('Course schedule')}</h3></div>
+          % if recent_courses:
+            % for enrollment in recent_courses:
+              <%
+                course_overview = enrollment.course_overview
+                if course_overview.has_ended():
+                    sched_label = _('Ended'); sched_date = course_overview.end
+                elif not course_overview.has_started():
+                    sched_label = _('Starts'); sched_date = course_overview.start
+                elif course_overview.end:
+                    sched_label = _('Ends'); sched_date = course_overview.end
+                else:
+                    sched_label = _('Started'); sched_date = course_overview.start
+              %>
+              <div class="nd-row">
+                <span class="nd-row-ic"><span class="fa fa-calendar-o" aria-hidden="true"></span></span>
+                <div>
+                  <div class="t">${course_overview.display_name_with_default}</div>
+                  <div class="s">${course_overview.display_org_with_default} &middot; ${course_overview.display_number_with_default}</div>
+                </div>
+                <span class="when">
+                  ${sched_label}
+                  % if sched_date:
+                    <br><span class="localized-datetime" data-language="${user_language}" data-timezone="${user_timezone}" data-datetime="${sched_date.strftime('%Y-%m-%dT%H:%M:%S%z')}" data-format="shortDate" data-string="{date}"></span>
+                  % else:
+                    <br>${_('No dates')}
+                  % endif
+                </span>
+              </div>
+            % endfor
+          % else:
+            <div class="nd-empty">
+              % if display_dashboard_courses:
+                ${_('You are not enrolled in any courses yet.')}
+              % else:
+                ${activate_account_message | n, decode.utf8}
+              % endif
+            </div>
+          % endif
+        </section>
+
+        <section class="nd-panel" id="upcoming-events" aria-labelledby="events-title">
+          <div class="nd-panel-h"><h3 id="events-title">${_('Upcoming course starts')}</h3><a class="more" href="${marketing_link('COURSES')}">${_('Discover')}</a></div>
+          % if upcoming_courses:
+            % for enrollment in upcoming_courses:
+              <% course_overview = enrollment.course_overview %>
+              <div class="nd-row">
+                <span class="nd-row-ic green"><span class="fa fa-rocket" aria-hidden="true"></span></span>
+                <div>
+                  <div class="t">${course_overview.display_name_with_default}</div>
+                  <div class="s">${course_overview.display_org_with_default} &middot; ${course_overview.display_number_with_default}</div>
+                </div>
+                <span class="when"><span class="localized-datetime" data-language="${user_language}" data-timezone="${user_timezone}" data-datetime="${course_overview.start.strftime('%Y-%m-%dT%H:%M:%S%z')}" data-format="shortDate" data-string="{date}"></span></span>
+              </div>
+            % endfor
+          % else:
+            <div class="nd-empty">${_('No upcoming course start dates are available.')}</div>
+          % endif
+        </section>
+
+        <section class="nd-panel" id="course-status" aria-labelledby="status-title">
+          <div class="nd-panel-h"><h3 id="status-title">${_('Learning status')}</h3><a class="more" href="#recommended-courses">${_('See courses')}</a></div>
+          % if active_courses:
+            % for enrollment in active_courses:
+              <%
+                co = enrollment.course_overview
+                cs = cert_statuses.get(enrollment.course_id, {})
+                if cs.get('status') == 'downloadable':
+                    st_label = _('Completed'); st_cls = 'is-done'
+                elif co.has_ended():
+                    st_label = _('Ended'); st_cls = 'is-ended'
+                elif not co.has_started():
+                    st_label = _('Not started'); st_cls = 'is-upcoming'
+                else:
+                    st_label = _('In progress'); st_cls = 'is-progress'
+              %>
+              <div class="nd-row">
+                <div>
+                  <div class="t">${co.display_name_with_default}</div>
+                  <div class="s">${co.display_org_with_default} &middot; ${co.display_number_with_default}</div>
+                </div>
+                <span class="nd-tag ${st_cls}">${st_label}</span>
+              </div>
+            % endfor
+          % else:
+            <div class="nd-empty">${_('You are not enrolled in any courses yet.')}</div>
+          % endif
+        </section>
+
+      </div>
+
+      <!-- Related Programs -->
+      <div class="nd-sec">
         <h2>${_('Related Programs')}</h2>
-        <a class="blend-link" href="${marketing_link('COURSES')}">${_('See all')}</a>
+        <a class="more" href="${marketing_link('COURSES')}">${_('See all')} &rarr;</a>
       </div>
       % if program_items:
         % for enrollment, program in program_items[:2]:
           <% course_overview = enrollment.course_overview %>
-          <article class="blend-program">
+          <article class="nd-program">
             <img src="${course_overview.image_urls['small']}" alt="" />
             <div>
               <h3>${program.get('title') or course_overview.display_name_with_default}</h3>
               <p>${program.get('subtitle') or program.get('type') or _('Program connected to your enrolled course.')}</p>
-              <div class="blend-program-tags"><span>${program.get('type') or _('Program')}</span><span>${course_overview.display_org_with_default}</span></div>
-              <a class="blend-button blend-primary" href="${course_home_url(course_overview.id)}">${_('View course')}</a>
+              <div class="nd-program-tags"><span>${program.get('type') or _('Program')}</span><span>${course_overview.display_org_with_default}</span></div>
+              <a class="nd-btn" href="${course_home_url(course_overview.id)}">${_('View course')}</a>
             </div>
-            <strong>${_('Active')}</strong>
+            <strong class="nd-active">${_('Active')}</strong>
           </article>
         % endfor
       % else:
-        <div class="blend-empty">${_('No related program data is available for your current enrollments.')}</div>
+        <div class="nd-empty">${_('No related program data is available for your current enrollments.')}</div>
       % endif
-    </section>
+
+    </div>
   </div>
 </main>
 
