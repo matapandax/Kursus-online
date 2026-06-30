@@ -146,3 +146,45 @@ msgstr "Tidak ada data program terkait untuk pendaftaran Anda saat ini."
 
 msgid "Close"
 msgstr "Tutup"
+
+msgid "Manage, create, and publish your courses in one place."
+msgstr "Kelola, buat, dan publikasikan course Anda di satu tempat."
+
+msgid "Total course"
+msgstr "Total kursus"
+
+msgid "Library"
+msgstr "Library"
+
+msgid "Archived"
+msgstr "Diarsipkan"
+
+msgid "Processing"
+msgstr "Diproses"
+
+msgid "Start from a blank course"
+msgstr "Mulai dari course kosong"
+
+msgid "Published"
+msgstr "Terpublikasi"
+
+msgid "Not published yet"
+msgstr "Belum dipublikasi"
+
+msgid "Draft"
+msgstr "Draf"
+
+msgid "Edit in Studio"
+msgstr "Edit di Studio"
+
+msgid "View Live"
+msgstr "Lihat live"
+
+msgid "{count} learners"
+msgstr "{count} peserta"
+
+msgid "Open library"
+msgstr "Buka library"
+
+msgid "Reusable content components"
+msgstr "Komponen konten dapat digunakan ulang"

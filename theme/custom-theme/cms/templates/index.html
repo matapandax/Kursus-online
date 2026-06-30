@@ -1,0 +1,849 @@
+<%page expression_filter="h"/>
+<%!
+from django.utils.translation import gettext as _
+from django.urls import reverse
+
+from openedx.core.djangolib.markup import HTML, Text
+from openedx.core.djangolib.js_utils import (
+      dump_js_escaped_json
+  )
+%>
+
+<%inherit file="base.html" />
+<%namespace name='static' file='static_content.html'/>
+<%def name="online_help_token()"><% return "home" %></%def>
+<%block name="title">${_("{studio_name} Home").format(studio_name=settings.STUDIO_SHORT_NAME)}</%block>
+<%block name="bodyclass">is-signedin index view-dashboard</%block>
+
+<%block name="requirejs">
+  require(["js/factories/index"], function (IndexFactory) {
+      IndexFactory();
+  });
+</%block>
+
+<%block name="content">
+<style>
+  /* ===== Portal Course Creator — selaras redesign Dashboard/Progress (scope .index); fungsi & React tetap ===== */
+  .index{ --brand:#2563eb; --brand-dark:#1d4ed8; --purple:#7c3aed; --ink:#1a2233; --soft:#5b6678; --faint:#8a93a6;
+    --line:#e6eaf2; --brand-soft:#e8efff; --green:#16a34a; --green-soft:#e7f6ee; --amber:#d97706; --amber-soft:#fdf0dd;
+    --surface:#fff; --shadow:0 1px 2px rgba(16,24,40,.04),0 8px 24px rgba(16,24,40,.06); }
+  body.index{ background:#f4f6fb !important; }
+  .index .wrapper-mast, .index .wrapper-content{ max-width:1180px; margin:0 auto; }
+  .index .mast.has-actions{ display:flex !important; align-items:flex-start; justify-content:space-between; gap:20px; flex-wrap:wrap; }
+  .index .mast.has-actions .page-header{ float:none !important; margin:0 !important; }
+  .index .mast.has-actions .nav-actions{ float:none !important; margin:0 !important; }
+  .index .mast .page-header{ font-size:26px !important; font-weight:800 !important; color:var(--ink) !important; }
+  /* New Course / New Library = brand */
+  .index .new-button{ background:var(--brand) !important; border:0 !important; border-radius:10px !important; color:#fff !important;
+    font-weight:700 !important; box-shadow:none !important; text-shadow:none !important; padding:10px 16px !important; }
+  .index .new-button:hover{ background:var(--brand-dark) !important; color:#fff !important; }
+
+  /* stat cards */
+  .index .pcc-stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin:6px 0 26px; }
+  .index .pcc-stat{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:16px 18px; box-shadow:var(--shadow); }
+  .index .pcc-stat .ic{ width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:16px;margin-bottom:10px;background:var(--brand-soft);color:var(--brand); }
+  .index .pcc-stat .ic.g{background:var(--green-soft);color:var(--green);} .index .pcc-stat .ic.p{background:#f1eafe;color:var(--purple);} .index .pcc-stat .ic.a{background:var(--amber-soft);color:var(--amber);}
+  .index .pcc-stat .big{ font-size:26px; font-weight:800; line-height:1; } .index .pcc-stat .cap{ font-size:12.5px; color:var(--faint); margin-top:7px; }
+  @media (max-width:820px){ .index .pcc-stats{ grid-template-columns:repeat(2,1fr);} }
+
+  /* layout: primary + sidebar */
+  .index .content{ display:grid !important; grid-template-columns:minmax(0,1fr) 320px; gap:28px; align-items:start; float:none !important; }
+  .index .content-primary, .index .content-supplementary{ float:none !important; width:auto !important; min-width:0 !important; margin:0 !important; }
+  @media (max-width:980px){ .index .content{ grid-template-columns:1fr; } }
+
+  /* tabs */
+  .index #course-index-tabs{ display:flex; gap:6px; border-bottom:1px solid var(--line); margin:6px 0 18px; padding:0; list-style:none; }
+  .index #course-index-tabs li{ margin:0 0 -1px; }
+  .index #course-index-tabs li a{ display:block; padding:10px 16px; font-size:14px; font-weight:700; color:var(--soft); border-bottom:2px solid transparent; text-decoration:none; }
+  .index #course-index-tabs li a:hover{ color:var(--brand); }
+  .index #course-index-tabs li.active a{ color:var(--brand); border-bottom-color:var(--brand); }
+
+  /* React course/library listing -> galeri kartu */
+  .index .list-courses{ display:grid !important; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:18px; margin:0 !important; padding:0 !important; list-style:none; border:0 !important; }
+  .index .list-courses .course-item{ background:var(--surface); border:1px solid var(--line) !important; border-radius:16px !important; box-shadow:var(--shadow); padding:18px 20px !important; margin:0 !important; display:flex; flex-direction:column; min-height:150px; transition:transform .15s, box-shadow .15s; }
+  .index .list-courses .course-item:hover{ transform:translateY(-3px); box-shadow:0 6px 14px rgba(16,24,40,.08),0 16px 40px rgba(16,24,40,.1); }
+  .index .course-item .course-title{ font-size:16px !important; font-weight:800 !important; color:var(--ink) !important; line-height:1.3; margin:0 0 8px !important; display:block; }
+  .index .course-item .course-title:hover{ color:var(--brand) !important; }
+  .index .course-item .course-metadata{ font-size:12.5px; margin-bottom:16px; display:flex; flex-wrap:wrap; gap:5px; }
+  .index .course-item .course-metadata .metadata-item .label{ display:none; }
+  .index .course-item .course-metadata .value{ color:var(--soft); font-weight:600; }
+  /* React sudah menyisipkan pemisah "/" antar metadata; tak perlu separator tambahan */
+  .index .course-item .course-actions, .index .course-item .item-actions{ margin-top:auto; display:flex; gap:10px; align-items:center; }
+  .index .course-item .course-actions .action{ flex:1; text-align:center; border:1px solid var(--line) !important; border-radius:10px !important; padding:9px 12px !important; font-size:13px !important; font-weight:700 !important; color:var(--soft) !important; background:#fff !important; text-decoration:none !important; box-shadow:none !important; }
+  .index .course-item .course-actions .action.action-view{ background:var(--brand) !important; border-color:var(--brand) !important; color:#fff !important; }
+  .index .course-item .course-actions .action:hover{ border-color:var(--brand) !important; }
+
+  /* create-course / create-library forms = kartu */
+  .index .wrapper-create-element .form-create{ background:var(--surface) !important; border:1px solid var(--line) !important; border-radius:16px !important; box-shadow:var(--shadow); padding:22px !important; margin-bottom:22px; }
+  .index .wrapper-create-element .title{ font-size:17px !important; font-weight:800 !important; color:var(--ink) !important; }
+  .index .wrapper-create-element input[type="text"], .index .wrapper-create-element select{ border:1px solid var(--line) !important; border-radius:10px !important; }
+  .index .wrapper-create-element .action-primary{ background:var(--brand) !important; border:0 !important; border-radius:10px !important; color:#fff !important; box-shadow:none !important; text-shadow:none !important; font-weight:700 !important; }
+  .index .wrapper-create-element .action-primary:hover{ background:var(--brand-dark) !important; }
+
+  /* sidebar bits = kartu */
+  .index .content-supplementary .bit{ background:var(--surface); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); padding:18px; margin-bottom:18px; }
+  .index .content-supplementary .title-3{ font-size:14px !important; font-weight:800 !important; color:var(--ink) !important; }
+
+  /* notice "create first course" = kartu */
+  .index .notice-instruction{ background:var(--surface); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); padding:6px 20px; }
+  .index .notice-instruction .action-primary{ background:var(--brand) !important; border:0 !important; border-radius:10px !important; color:#fff !important; font-weight:700 !important; box-shadow:none !important; }
+
+  /* page subtitle */
+  .index .pcc-subtitle{ font-size:13.5px; color:var(--faint); margin:2px 0 0; }
+
+  /* ===== Jalur B: galeri Mako kartu course/library (mirip mockup) ===== */
+  .index .pcc-gallery{ display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin:0 0 8px; }
+  @media (max-width:1100px){ .index .pcc-gallery{ grid-template-columns:repeat(2,1fr);} }
+  @media (max-width:680px){ .index .pcc-gallery{ grid-template-columns:1fr;} }
+  .index .pcc-ccard{ background:var(--surface); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); overflow:hidden; display:flex; flex-direction:column; transition:transform .15s, box-shadow .15s; }
+  .index .pcc-ccard:hover{ transform:translateY(-3px); box-shadow:0 6px 14px rgba(16,24,40,.08),0 16px 40px rgba(16,24,40,.1); }
+  .index .pcc-thumb{ height:120px; position:relative; }
+  .index .pcc-thumb .ovl{ position:absolute; inset:0; background:linear-gradient(180deg,rgba(0,0,0,.04),rgba(0,0,0,.22)); }
+  .index .pcc-thumb .chip, .index .pcc-thumb .pcc-badge{ position:absolute; left:12px; top:12px; display:inline-flex; align-items:center; gap:6px; background:#fff; color:var(--ink); font-size:10.5px; font-weight:800; padding:4px 10px; border-radius:999px; text-transform:uppercase; letter-spacing:.03em; z-index:1; box-shadow:0 1px 3px rgba(16,24,40,.18); }
+  .index .pcc-badge .d{ width:7px; height:7px; border-radius:50%; }
+  .index .pcc-badge.pub{ color:var(--green);} .index .pcc-badge.pub .d{ background:var(--green);}
+  .index .pcc-badge.draft{ color:var(--amber);} .index .pcc-badge.draft .d{ background:var(--amber);}
+  .index .pcc-cbody{ padding:16px 18px 18px; display:flex; flex-direction:column; flex:1; }
+  .index .pcc-ctitle{ font-size:15.5px; font-weight:800; color:var(--ink); margin:0 0 3px; line-height:1.3; }
+  .index .pcc-cmeta{ font-size:12px; color:var(--soft); font-weight:600; margin-bottom:8px; }
+  .index .pcc-cstat{ display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--faint); margin-bottom:16px; }
+  .index .pcc-cstat .d{ width:7px; height:7px; border-radius:50%; flex:none; }
+  .index .pcc-cstat .d.pub{ background:var(--green);} .index .pcc-cstat .d.draft{ background:var(--amber);}
+  .index .pcc-cactions{ display:flex; gap:6px; margin-top:auto; align-items:stretch; flex-wrap:wrap; }
+  .index a.pcc-btn{ flex:0 0 auto; white-space:nowrap; display:inline-flex; align-items:center; justify-content:center; gap:6px; background:var(--brand); color:#fff !important; border:0; border-radius:10px; padding:9px 11px; font-size:12px; font-weight:700; text-decoration:none !important; }
+  .index a.pcc-btn.ghost{ flex:0 0 auto; background:#fff; color:var(--ink) !important; border:1px solid var(--line); }
+  .index a.pcc-btn:hover{ background:var(--brand-dark); color:#fff !important; }
+  .index a.pcc-btn.ghost:hover{ border-color:var(--brand); color:var(--brand) !important; }
+  .index a.pcc-icobtn{ width:34px; flex:none; border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--soft) !important; display:grid; place-items:center; text-decoration:none !important; }
+  .index a.pcc-icobtn:hover{ border-color:var(--brand); color:var(--brand) !important; }
+  .index a.pcc-newtile{ border:2px dashed #cdd4e0; border-radius:16px; background:#fbfcfe; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; min-height:230px; cursor:pointer; color:var(--brand) !important; font-weight:700; text-decoration:none !important; transition:border-color .15s, background .15s; text-align:center; }
+  .index a.pcc-newtile:hover{ border-color:var(--brand); background:var(--brand-soft); }
+  .index a.pcc-newtile .plus{ width:52px; height:52px; border-radius:50%; background:var(--brand-soft); color:var(--brand); display:grid; place-items:center; font-size:26px; }
+  .index a.pcc-newtile small{ color:var(--faint); font-weight:500; font-size:12px; }
+</style>
+<div class="wrapper-mast wrapper">
+  <header class="mast has-actions">
+    <div>
+      <h1 class="page-header">${_("{studio_name} Home").format(studio_name=settings.STUDIO_SHORT_NAME)}</h1>
+      <p class="pcc-subtitle">${_("Manage, create, and publish your courses in one place.")}</p>
+    </div>
+
+    % if user.is_active:
+    <nav class="nav-actions" aria-label="${_('Page Actions')}">
+      <h3 class="sr">${_("Page Actions")}</h3>
+      <ul>
+        <li class="nav-item">
+          % if course_creator_status=='granted':
+          <a href="#" class="button new-button new-course-button"><span class="icon fa fa-plus icon-inline" aria-hidden="true"></span>
+              ${_("New Course")}</a>
+          % elif course_creator_status=='disallowed_for_this_site' and settings.FEATURES.get('STUDIO_REQUEST_EMAIL',''):
+          <a href="mailto:${settings.FEATURES.get('STUDIO_REQUEST_EMAIL','')}">${_("Email staff to create course")}</a>
+          % endif
+          % if show_new_library_button:
+            <a href="#" class="button new-button new-library-button"><span class="icon fa fa-plus icon-inline" aria-hidden="true"></span>
+            ${_("New Library")}</a>
+          % endif
+        </li>
+      </ul>
+    </nav>
+    % endif
+  </header>
+</div>
+
+<div class="wrapper-content wrapper">
+  % if user.is_active:
+  <section class="content">
+    <article class="content-primary" role="main">
+
+      <%
+        try: _nc = len(courses)
+        except Exception: _nc = 0
+        _libs = context.get('libraries') or []
+        _nl = len(_libs) if isinstance(_libs, (list, tuple)) else 0
+        _arch = context.get('archived_courses')
+        _na = len(_arch) if isinstance(_arch, (list, tuple)) else 0
+        _proc = context.get('in_process_course_actions') or []
+        _np = len(_proc) if isinstance(_proc, (list, tuple)) else 0
+      %>
+      <div class="pcc-stats">
+        <div class="pcc-stat"><div class="ic">&#128218;</div><div class="big">${_nc}</div><div class="cap">${_('Total course')}</div></div>
+        <div class="pcc-stat"><div class="ic p">&#128451;</div><div class="big">${_nl}</div><div class="cap">${_('Library')}</div></div>
+        <div class="pcc-stat"><div class="ic a">&#128451;</div><div class="big">${_na}</div><div class="cap">${_('Archived')}</div></div>
+        <div class="pcc-stat"><div class="ic g">&#9203;</div><div class="big">${_np}</div><div class="cap">${_('Processing')}</div></div>
+      </div>
+
+      % if course_creator_status=='granted':
+      <div class="wrapper-create-element wrapper-create-course">
+        <form class="form-create create-course course-info" id="create-course-form" name="create-course-form">
+          <div class="wrap-error">
+            <div id="course_creation_error" name="course_creation_error" class="message message-status message-status error" role="alert">
+            <p>${_("Please correct the highlighted fields below.")}</p>
+            </div>
+          </div>
+
+          <div class="wrapper-form">
+            <h3 class="title">${_("Create a New Course")}</h3>
+
+            <fieldset>
+              <legend class="sr">${_("Required Information to Create a New Course")}</legend>
+
+              <ol class="list-input">
+                <li class="field text required" id="field-course-name">
+                  <label for="new-course-name">${_("Course Name")}</label>
+                  ## Translators: This is an example name for a new course, seen when
+                  ## filling out the form to create a new course.
+                  <input class="new-course-name" id="new-course-name" type="text" name="new-course-name" required placeholder="${_('e.g. Introduction to Computer Science')}" aria-describedby="tip-new-course-name tip-error-new-course-name" />
+                  <span class="tip" id="tip-new-course-name">${_("The public display name for your course. This cannot be changed, but you can set a different display name in Advanced Settings later.")}</span>
+                  <span class="tip tip-error is-hiding" id="tip-error-new-course-name"></span>
+                </li>
+                <li class="field text required">
+                  <label for="new-course-org">${_("Organization")}</label>
+                  ## Translators: This is an example for the name of the organization sponsoring a course, seen when filling out the form to create a new course. The organization name cannot contain spaces.
+                  ## Translators: "e.g. UniversityX or OrganizationX" is a placeholder displayed when user put no data into this field.
+                  % if can_create_organizations:
+                    <input class="new-course-org" id="new-course-org" type="text" name="new-course-org" required placeholder="${_('e.g. UniversityX or OrganizationX')}" aria-describedby="tip-new-course-org tip-error-new-course-org" />
+                  % else:
+                    <select class="new-course-org" id="new-course-org" name="new-course-org" required aria-describedby="tip-new-course-org tip-error-new-course-org">
+                      % for org in allowed_organizations:
+                        <option value="${org}">${org}</option>
+                      % endfor
+                    </select>
+                  % endif
+                  <span class="tip" id="tip-new-course-org">${Text(_("The name of the organization sponsoring the course. {strong_start}Note: The organization name is part of the course URL.{strong_end} This cannot be changed, but you can set a different display name in Advanced Settings later.")).format(
+                      strong_start=HTML('<strong>'),
+                      strong_end=HTML('</strong>'),
+                  )}</span>
+                  <span class="tip tip-error is-hiding" id="tip-error-new-course-org"></span>
+                </li>
+
+                <li class="field text required" id="field-course-number">
+                  <label for="new-course-number">${_("Course Number")}</label>
+                  ## Translators: This is an example for the number used to identify a course,
+                  ## seen when filling out the form to create a new course. The number here is
+                  ## short for "Computer Science 101". It can contain letters but cannot contain spaces.
+                  <input class="new-course-number" id="new-course-number" type="text" name="new-course-number" required placeholder="${_('e.g. CS101')}" aria-describedby="tip-new-course-number tip-error-new-course-number" />
+                  <span class="tip" id="tip-new-course-number">${Text(_("The unique number that identifies your course within your organization. {strong_start}Note: This is part of your course URL, so no spaces or special characters are allowed and it cannot be changed.{strong_end}")).format(
+                      strong_start=HTML('<strong>'),
+                      strong_end=HTML('</strong>'),
+                  )}</span>
+                  <span class="tip tip-error is-hiding" id="tip-error-new-course-number"></span>
+                </li>
+
+                <li class="field text required" id="field-course-run">
+                  <label for="new-course-run">${_("Course Run")}</label>
+                  ## Translators: This is an example for the "run" used to identify different
+                  ## instances of a course, seen when filling out the form to create a new course.
+                  <input class="new-course-run" id="new-course-run" type="text" name="new-course-run" required placeholder="${_('e.g. 2014_T1')}" aria-describedby="tip-new-course-run tip-error-new-course-run" />
+                  <span class="tip" id="tip-new-course-run">${Text(_("The term in which your course will run. {strong_start}Note: This is part of your course URL, so no spaces or special characters are allowed and it cannot be changed.{strong_end}")).format(
+                      strong_start=HTML('<strong>'),
+                      strong_end=HTML('</strong>'),
+                  )}</span>
+                  <span class="tip tip-error is-hiding" id="tip-error-new-course-run"></span>
+                </li>
+              </ol>
+
+            </fieldset>
+          </div>
+
+          <div class="actions">
+            <input type="hidden" value="${allow_unicode_course_id}" class="allow-unicode-course-id" />
+            <input type="submit" value="${_('Create')}" class="action action-primary new-course-save" />
+            <input type="button" value="${_('Cancel')}" class="action action-secondary action-cancel new-course-cancel" />
+          </div>
+        </form>
+      </div>
+
+      % endif
+
+      %if libraries_enabled and show_new_library_button:
+      <div class="wrapper-create-element wrapper-create-library">
+        <form class="form-create create-library library-info" id="create-library-form" name="create-library-form">
+          <div class="wrap-error">
+            <div id="library_creation_error" name="library_creation_error" class="message message-status message-status error" role="alert">
+            <p>${_("Please correct the highlighted fields below.")}</p>
+            </div>
+          </div>
+
+          <div class="wrapper-form">
+            <h3 class="title">${_("Create a New Library")}</h3>
+
+            <fieldset>
+              <legend class="sr">${_("Required Information to Create a New Library")}</legend>
+
+              <ol class="list-input">
+                <li class="field text required" id="field-library-name">
+                  <label for="new-library-name">${_("Library Name")}</label>
+                  ## Translators: This is an example name for a new content library, seen when
+                  ## filling out the form to create a new library.
+                  ## (A library is a collection of content or problems.)
+                  <input class="new-library-name" id="new-library-name" type="text" name="new-library-name" required placeholder="${_('e.g. Computer Science Problems')}" aria-describedby="tip-new-library-name tip-error-new-library-name" />
+                  <span class="tip" id="tip-new-library-name">${_("The public display name for your library.")}</span>
+                  <span class="tip tip-error is-hiding" id="tip-error-new-library-name"></span>
+                </li>
+                <li class="field text required">
+                  <label for="new-library-org">${_("Organization")}</label>
+                  % if can_create_organizations:
+                    <input class="new-library-org" id="new-library-org" type="text" name="new-library-org" required placeholder="${_('e.g. UniversityX or OrganizationX')}" aria-describedby="tip-new-library-org tip-error-new-library-org" />
+                  % else:
+                    <select class="new-library-org" id="new-library-org" name="new-library-org" required aria-describedby="tip-new-library-org tip-error-new-library-org">
+                      % for org in allowed_organizations_for_libraries:
+                        <option value="${org}">${org}</option>
+                      % endfor
+                    </select>
+                  % endif
+                  <span class="tip" id="tip-new-library-org">${_("The public organization name for your library.")} ${_("This cannot be changed.")}</span>
+                  <span class="tip tip-error is-hiding" id="tip-error-new-library-org"></span>
+                </li>
+
+                <li class="field text required" id="field-library-number">
+                  <label for="new-library-number">${_("Library Code")}</label>
+                  ## Translators: This is an example for the "code" used to identify a library,
+                  ## seen when filling out the form to create a new library. This example is short
+                  ## for "Computer Science Problems". The example number may contain letters
+                  ## but must not contain spaces.
+                  <input class="new-library-number" id="new-library-number" type="text" name="new-library-number" required placeholder="${_('e.g. CSPROB')}" aria-describedby="tip-new-library-number tip-error-new-library-number" />
+                  <span class="tip" id="tip-new-library-number">${Text(_("The unique code that identifies this library. {strong_start}Note: This is part of your library URL, so no spaces or special characters are allowed.{strong_end} This cannot be changed.")).format(
+                      strong_start=HTML('<strong>'),
+                      strong_end=HTML('</strong>'),
+                  )}</span>
+                  <span class="tip tip-error is-hiding" id="tip-error-new-library-number"></span>
+                </li>
+              </ol>
+
+            </fieldset>
+          </div>
+
+          <div class="actions">
+            <input type="hidden" value="${allow_unicode_course_id}" class="allow-unicode-course-id" />
+            <input type="submit" value="${_('Create')}" class="action action-primary new-library-save" />
+            <input type="button" value="${_('Cancel')}" class="action action-secondary action-cancel new-library-cancel" />
+          </div>
+        </form>
+      </div>
+      % endif
+
+      %if optimization_enabled:
+      <div class="optimization-form">
+        <h2 class="title title-3">${_("Organization and Library Settings")}</h2>
+        <form class="form" action="/home/" method="GET">
+          <fieldset class="form-group">
+            <div class="field">
+              <label class="field-label">${_("Show all courses in organization:")}
+                <input class="field-input input-text" type="text" name="org"
+                       placeholder="${_('For example, MITx')}"/>
+              </label>
+            </div>
+          </fieldset>
+          <div class="form-actions">
+              <button class="btn-brand btn-base" type="submit">${_("Submit")}</button>
+          </div>
+        </form>
+      </div>
+      %endif
+
+      <!-- STATE: processing courses -->
+      %if allow_course_reruns and rerun_creator_status and len(in_process_course_actions) > 0:
+      <div class="courses courses-processing">
+          <h3 class="title">${_("Courses Being Processed")}</h3>
+
+          <ul class="list-courses">
+            %for course_info in sorted(in_process_course_actions, key=lambda s: s['display_name'].lower() if s['display_name'] is not None else ''):
+            <!-- STATE: re-run is processing -->
+            %if course_info['is_in_progress']:
+            <li class="wrapper-course has-status" data-course-key="${course_info['course_key']}">
+              <div class="course-item course-rerun is-processing">
+                <div class="course-details" href="#">
+                  <h3 class="course-title">${course_info['display_name']}</h3>
+
+                  <div class="course-metadata">
+                    <span class="course-org metadata-item">
+                      <span class="label">${_("Organization:")}</span> <span class="value">${course_info['org']}</span>
+                    </span>
+                    <span class="course-num metadata-item">
+                      <span class="label">${_("Course Number:")}</span>
+                      <span class="value">${course_info['number']}</span>
+                    </span>
+                    <span class="course-run metadata-item">
+                      <span class="label">${_("Course Run:")}</span> <span class="value">${course_info['run']}</span>
+                    </span>
+                  </div>
+                </div>
+
+                <dl class="course-status">
+                  <dt class="label sr">${_("This course run is currently being created.")}</dt>
+                  <dd class="value">
+                    <span class="icon fa fa-refresh fa-spin" aria-hidden="true"></span>
+                    ## Translators: This is a status message, used to inform the user of
+                    ## what the system is doing. This status means that the user has
+                    ## requested to re-run an existing course, and the system is currently
+                    ## in the process of duplicating and configuring the existing course
+                    ## so that it can be re-run.
+                    <span class="copy">${_("Configuring as re-run")}</span>
+                  </dd>
+                </dl>
+              </div>
+
+              <div class="status-message">
+                <p class="copy">${Text(_('The new course will be added to your course list in 5-10 minutes. Return to this page or {link_start}refresh it{link_end} to update the course list. The new course will need some manual configuration.')).format(
+                    link_start=HTML('<a href="#" class="action-reload">'),
+                    link_end=HTML('</a>'),
+                  )}</p>
+              </div>
+            </li>
+            %endif
+
+            <!-- - - - -->
+
+            <!-- STATE: re-run has error -->
+            %if course_info['is_failed']:
+            <li class="wrapper-course has-status" data-course-key="${course_info['course_key']}">
+              <div class="course-item course-rerun has-error">
+                <div class="course-details" href="#">
+                  <h3 class="course-title">${course_info['display_name']}</h3>
+
+                  <div class="course-metadata">
+                    <span class="course-org metadata-item">
+                      <span class="label">${_("Organization:")}</span> <span class="value">${course_info['org']}</span>
+                    </span>
+                    <span class="course-num metadata-item">
+                      <span class="label">${_("Course Number:")}</span>
+                      <span class="value">${course_info['number']}</span>
+                    </span>
+                    <span class="course-run metadata-item">
+                      <span class="label">${_("Course Run:")}</span> <span class="value">${course_info['run']}</span>
+                    </span>
+                  </div>
+                </div>
+
+                <dl class="course-status">
+                  ## Translators: This is a status message for the course re-runs feature.
+                  ## When a course admin indicates that a course should be re-run, the system
+                  ## needs to process the request and prepare the new course. The status of
+                  ## the process will follow this text.
+                  <dt class="label sr">${_("This re-run processing status:")}</dt>
+                  <dd class="value">
+                    <span class="icon fa fa-warning" aria-hidden="true"></span>
+                    <span class="copy">${_("Configuration Error")}</span>
+                  </dd>
+                </dl>
+              </div>
+
+              <div class="status-message has-actions">
+                <p class="copy">${_("A system error occurred while your course was being processed. Please go to the original course to try the re-run again, or contact your PM for assistance.")}</p>
+
+                <ul  class="status-actions">
+                  <li class="action action-dismiss">
+                    <a href="#" class="button dismiss-button" data-dismiss-link="${course_info['dismiss_link']}">
+                      <span class="icon fa fa-times-circle" aria-hidden="true"></span>
+                      <span class="button-copy">${_("Dismiss")}</span>
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </li>
+            %endif
+            %endfor
+          </ul>
+      </div>
+      %endif
+
+      % if libraries_enabled or archived_courses:
+      <ul id="course-index-tabs">
+      <li class="courses-tab ${ 'active' if active_tab == 'courses' else ''}">
+          % if split_studio_home and active_tab == 'libraries':
+            <a href="${reverse('home')}">${_("Courses")}</a>
+          % else:
+            <a href="#">${_("Courses")}</a>
+          % endif
+       </li>
+        % if archived_courses:
+        <li class="archived-courses-tab">
+            % if split_studio_home and active_tab == 'libraries':
+                <a href="${reverse('home') + '#archived-courses-tab' } " >${_("Archived Courses")}</a>
+            % else:
+                <a href="#" >${_("Archived Courses")}</a>
+            % endif
+        </li>
+        % endif
+
+        % if libraries_enabled:
+            % if redirect_to_library_authoring_mfe:
+            <li><a href="${library_authoring_mfe_url}">${_("Libraries")}</a></li>
+            %else:
+             <li class="libraries-tab ${ 'active' if active_tab == 'libraries' else ''}">
+                % if split_studio_home:
+                  <a href="${reverse('home_library')}">${_("Libraries")}</a>
+                % else:
+                  <a href="#" >${_("Libraries")}</a>
+                % endif
+             </li>
+            % endif
+        % endif
+      </ul>
+      % endif
+
+      %if len(courses) > 0 or optimization_enabled:
+      <div class="courses courses-tab ${ 'active' if active_tab == 'courses' else ''}">
+        <%
+          _grads = ['linear-gradient(135deg,#2563eb,#7c3aed)','linear-gradient(135deg,#16a34a,#0891b2)',
+                    'linear-gradient(135deg,#d97706,#dc2626)','linear-gradient(135deg,#7c3aed,#db2777)',
+                    'linear-gradient(135deg,#475569,#312e81)','linear-gradient(135deg,#0891b2,#2563eb)']
+          _can_rerun = allow_course_reruns and rerun_creator_status and course_creator_status=='granted'
+          _sorted_courses = sorted(courses, key=lambda s: s['display_name'].lower() if s['display_name'] is not None else '')
+        %>
+        <%
+          ## Pengayaan data NYATA (status publikasi via CourseOverview + jumlah peserta) — defensif.
+          _ov = {}; _enr = {}; _keymap = {}
+          try:
+              from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+              from common.djangoapps.student.models import CourseEnrollment
+              from opaque_keys.edx.keys import CourseKey
+              from django.db.models import Count
+              _keys = []
+              for _c in _sorted_courses:
+                  try:
+                      _ck = CourseKey.from_string((_c.get('url') or '').split('/course/')[-1])
+                      _keymap[_c['url']] = _ck; _keys.append(_ck)
+                  except Exception:
+                      pass
+              if _keys:
+                  _ov = {str(o.id): o for o in CourseOverview.objects.filter(id__in=_keys)}
+                  for _row in CourseEnrollment.objects.filter(course_id__in=_keys, is_active=True).values('course_id').annotate(n=Count('id')):
+                      _enr[str(_row['course_id'])] = _row['n']
+          except Exception:
+              _ov = {}; _enr = {}; _keymap = {}
+        %>
+        <div class="pcc-gallery">
+          % if course_creator_status=='granted':
+          <a href="#" class="pcc-newtile new-course-button">
+            <span class="plus" aria-hidden="true">+</span>
+            <span>${_('New Course')}</span>
+            <small>${_('Start from a blank course')}</small>
+          </a>
+          % endif
+          % for _i, c in enumerate(_sorted_courses):
+          <%
+            _ck = _keymap.get(c['url'])
+            _published = (_ov.get(str(_ck)) is not None) if _ck else False
+            _npeserta = _enr.get(str(_ck), 0) if _ck else 0
+          %>
+          <article class="pcc-ccard">
+            <div class="pcc-thumb" style="background:${_grads[_i % len(_grads)]}">
+              <div class="ovl"></div>
+              % if _published:
+              <span class="pcc-badge pub"><span class="d"></span>${_('Published')}</span>
+              % else:
+              <span class="pcc-badge draft"><span class="d"></span>${_('Draft')}</span>
+              % endif
+            </div>
+            <div class="pcc-cbody">
+              <h3 class="pcc-ctitle">${c['display_name'] or c['number']}</h3>
+              <div class="pcc-cmeta">${c['org']} &middot; ${c['number']} &middot; ${c['run']}</div>
+              <div class="pcc-cstat">
+                % if _published:
+                <span class="d pub"></span>${_('Published')}
+                  % if _npeserta:
+                &middot; ${_('{count} learners').format(count=_npeserta)}
+                  % endif
+                % else:
+                <span class="d draft"></span>${_('Not published yet')}
+                % endif
+              </div>
+              <div class="pcc-cactions">
+                % if c['url']:
+                <a class="pcc-btn course-link" href="${c['url']}"><span class="icon fa fa-pencil" aria-hidden="true"></span> ${_('Edit in Studio')}</a>
+                % endif
+                % if c['lms_link']:
+                <a class="pcc-btn ghost" href="${c['lms_link']}" rel="noopener" target="_blank">${_('View Live')}</a>
+                % endif
+                % if _can_rerun and c.get('rerun_link'):
+                <a class="pcc-icobtn" href="${c['rerun_link']}" title="${_('Re-run Course')}"><span class="icon fa fa-refresh" aria-hidden="true"></span></a>
+                % endif
+              </div>
+            </div>
+          </article>
+          % endfor
+        </div>
+      </div>
+
+      %else:
+      <div class="notice notice-incontext notice-instruction notice-instruction-nocourses list-notices courses-tab ${ 'active' if active_tab == 'courses' else ''}">
+        <div class="notice-item">
+          <div class="msg">
+            <h3 class="title">${_("Are you staff on an existing {studio_name} course?").format(studio_name=settings.STUDIO_SHORT_NAME)}</h3>
+            <div class="copy">
+              <p>${_('The course creator must give you access to the course. Contact the course creator or administrator for the course you are helping to author.')}</p>
+            </div>
+          </div>
+        </div>
+
+        %if course_creator_status == "granted":
+        <div class="notice-item has-actions">
+          <div class="msg">
+            <h3 class="title">${_('Create Your First Course')}</h3>
+            <div class="copy">
+              <p>${_('Your new course is just a click away!')}</p>
+            </div>
+          </div>
+
+          <ul class="list-actions">
+            <li class="action-item">
+              <a href="#" class="action-primary action-create action-create-course new-course-button"><span class="icon fa fa-plus icon-inline" aria-hidden="true"></span> ${_('Create Your First Course')}</a>
+            </li>
+          </ul>
+        </div>
+        % endif
+
+      </div>
+      % endif
+
+
+      %if course_creator_status == "unrequested":
+      <div class="wrapper wrapper-creationrights">
+        <h3 class="title">
+          <a href="#instruction-creationrights" class="ui-toggle-control show-creationrights"><span class="label">${_('Becoming a Course Creator in {studio_name}').format(studio_name=settings.STUDIO_SHORT_NAME)}</span> <span class="icon fa fa-times-circle" aria-hidden="true"></span></a>
+        </h3>
+
+        <div class="notice notice-incontext notice-instruction notice-instruction-creationrights ui-toggle-target" id="instruction-creationrights">
+          <div class="copy">
+            <p>${_('{studio_name} is a hosted solution for our xConsortium partners and selected guests. Courses for which you are a team member appear above for you to edit, while course creator privileges are granted by {platform_name}. Our team will evaluate your request and provide you feedback within 24 hours during the work week.').format(
+              studio_name=settings.STUDIO_NAME, platform_name=settings.PLATFORM_NAME)}</p>
+          </div>
+
+          <div class="status status-creationrights is-unrequested">
+            <h4 class="title">${_('Your Course Creator Request Status:')}</h4>
+
+            <form id="request-coursecreator" action="${request_course_creator_url}" method="post" enctype="multipart/form-data">
+              <div class="form-actions">
+                <button type="submit" id="request-coursecreator-submit" name="request-coursecreator-submit" class="action-primary action-request"><span class="icon fa fa-cog icon-inline fa fa-spin" aria-hidden="true"></span> <span class="label">${_('Request the Ability to Create Courses')}</span></button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      %elif course_creator_status == "denied":
+      <div class="wrapper wrapper-creationrights is-shown">
+        <h3 class="title">
+          <a href="#instruction-creationrights" class="ui-toggle-control current show-creationrights"><span class="label">${_('Your Course Creator Request Status')}</span> <span class="icon fa fa-times-circle" aria-hidden="true"></span></a>
+        </h3>
+
+        <div class="notice notice-incontext notice-instruction notice-instruction-creationrights ui-toggle-target" id="instruction-creationrights">
+          <div class="copy">
+            <p>${_('{studio_name} is a hosted solution for our xConsortium partners and selected guests. Courses for which you are a team member appear above for you to edit, while course creator privileges are granted by {platform_name}. Our team is has completed evaluating your request.').format(
+              studio_name=settings.STUDIO_NAME, platform_name=settings.PLATFORM_NAME,
+            )}</p>
+          </div>
+
+          <div class="status status-creationrights has-status is-denied">
+            <h4 class="title">${_('Your Course Creator Request Status:')}</h4>
+
+            <dl class="status-update">
+              <dt class="label">${_('Your Course Creator request is:')}</dt>
+              <dd class="value">
+                <span class="status-indicator"></span>
+                <span class="value-formal">${_('Denied')}</span>
+                <span class="value-description">${_('Your request did not meet the criteria/guidelines specified by {platform_name} Staff.').format(platform_name=settings.PLATFORM_NAME)}</span>
+              </dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+
+      %elif course_creator_status == "pending":
+      <div class="wrapper wrapper-creationrights is-shown">
+        <h3 class="title">
+          <a href="#instruction-creationrights" class="ui-toggle-control current show-creationrights"><span class="label">${_('Your Course Creator Request Status')}</span> <span class="icon fa fa-times-circle" aria-hidden="true"></span></a>
+        </h3>
+
+        <div class="notice notice-incontext notice-instruction notice-instruction-creationrights ui-toggle-target" id="instruction-creationrights">
+          <div class="copy">
+            <p>${_('{studio_name} is a hosted solution for our xConsortium partners and selected guests. Courses for which you are a team member appear above for you to edit, while course creator privileges are granted by {platform_name}. Our team is currently  evaluating your request.').format(
+              studio_name=settings.STUDIO_NAME, platform_name=settings.PLATFORM_NAME,
+            )}</p>
+          </div>
+
+          <div class="status status-creationrights has-status is-pending">
+            <h4 class="title">${_('Your Course Creator Request Status:')}</h4>
+
+            <dl class="status-update">
+              <dt class="label">${_('Your Course Creator request is:')}</dt>
+              <dd class="value">
+                <span class="status-indicator"></span>
+                <span class="value-formal">${_('Pending')}</span>
+                <span class="value-description">
+                  ${_('Your request is currently being reviewed by {platform_name} staff and should be updated shortly.').format(platform_name=settings.PLATFORM_NAME)}
+                </span>
+              </dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+      % endif
+
+      %if archived_courses:
+      <div class="archived-courses archived-courses-tab">
+        % if type(archived_courses) is list:
+        <%
+          _agrads = ['linear-gradient(135deg,#64748b,#334155)','linear-gradient(135deg,#475569,#312e81)']
+          _sorted_arch = sorted(archived_courses, key=lambda s: s['display_name'].lower() if s['display_name'] is not None else '')
+        %>
+        <div class="pcc-gallery">
+          % for _i, c in enumerate(_sorted_arch):
+          <article class="pcc-ccard">
+            <div class="pcc-thumb" style="background:${_agrads[_i % len(_agrads)]}"><div class="ovl"></div><span class="chip">${_('Archived')}</span></div>
+            <div class="pcc-cbody">
+              <h3 class="pcc-ctitle">${c['display_name'] or c['number']}</h3>
+              <div class="pcc-cmeta">${c['org']} &middot; ${c['number']} &middot; ${c['run']}</div>
+              <div class="pcc-cactions">
+                % if c['url']:
+                <a class="pcc-btn course-link" href="${c['url']}"><span class="icon fa fa-pencil" aria-hidden="true"></span> ${_('Edit in Studio')}</a>
+                % endif
+                % if c['lms_link']:
+                <a class="pcc-btn ghost" href="${c['lms_link']}" rel="noopener" target="_blank">${_('View Live')}</a>
+                % endif
+              </div>
+            </div>
+          </article>
+          % endfor
+        </div>
+        % endif
+      </div>
+      %endif
+
+      %if len(libraries) > 0 or optimization_enabled:
+      <div class="libraries libraries-tab ${ 'active' if active_tab == 'libraries' else ''}">
+        <%
+          _lgrads = ['linear-gradient(135deg,#7c3aed,#2563eb)','linear-gradient(135deg,#0891b2,#16a34a)','linear-gradient(135deg,#db2777,#7c3aed)']
+          _sorted_libs = sorted(libraries, key=lambda s: s['display_name'].lower() if s['display_name'] is not None else '')
+        %>
+        <div class="pcc-gallery">
+          % if show_new_library_button:
+          <a href="#" class="pcc-newtile new-library-button">
+            <span class="plus" aria-hidden="true">+</span>
+            <span>${_('New Library')}</span>
+            <small>${_('Reusable content components')}</small>
+          </a>
+          % endif
+          % for _i, lib in enumerate(_sorted_libs):
+          <article class="pcc-ccard">
+            <div class="pcc-thumb" style="background:${_lgrads[_i % len(_lgrads)]}"><div class="ovl"></div><span class="chip">${_('Library')}</span></div>
+            <div class="pcc-cbody">
+              <h3 class="pcc-ctitle">${lib['display_name'] or lib['number']}</h3>
+              <div class="pcc-cmeta">${lib['org']} &middot; ${lib['number']}</div>
+              <div class="pcc-cactions">
+                % if lib['url']:
+                <a class="pcc-btn library-link" href="${lib['url']}"><span class="icon fa fa-pencil" aria-hidden="true"></span> ${_('Open library')}</a>
+                % endif
+              </div>
+            </div>
+          </article>
+          % endfor
+        </div>
+      </div>
+
+      %else:
+      <div class="notice notice-incontext notice-instruction notice-instruction-nocourses list-notices libraries-tab">
+        <div class="notice-item">
+          <div class="msg">
+              <h3 class="title">${_("Were you expecting to see a particular library here?")}</h3>
+              <div class="copy">
+                  <p>${_('The library creator must give you access to the library. Contact the library creator or administrator for the library you are helping to author.')}</p>
+              </div>
+          </div>
+        </div>
+        % if show_new_library_button:
+        <div class="notice-item has-actions">
+          <div class="msg">
+              <h3 class="title">${_('Create Your First Library')}</h3>
+              <div class="copy">
+                  <p>${_('Libraries hold a pool of components that can be re-used across multiple courses. Create your first library with the click of a button!')}</p>
+              </div>
+          </div>
+
+        <ul class="list-actions">
+          <li class="action-item">
+              <a href="#" class="action-primary action-create new-button action-create-library new-library-button"><span class="icon fa fa-plus icon-inline" aria-hidden="true"></span> ${_('Create Your First Library')}</a>
+          </li>
+        </ul>
+        </div>
+        % endif
+      </div>
+      %endif
+
+    </article>
+    <aside class="content-supplementary" role="complementary">
+      <div class="bit">
+        <h3 class="title title-3">${_('New to {studio_name}?').format(studio_name=settings.STUDIO_NAME)}</h3>
+        <p>${_('Click Help in the upper-right corner to get more information about the {studio_name} page you are viewing. You can also use the links at the bottom of the page to access our continually updated documentation and other {studio_name} resources.').format(studio_name=settings.STUDIO_SHORT_NAME)}</p>
+
+        <ol class="list-actions">
+          <li class="action-item">
+
+            <a href="${get_online_help_info(online_help_token())['doc_url']}" rel="noopener" target="_blank">${_("Getting Started with {studio_name}").format(studio_name=settings.STUDIO_NAME)}</a>
+          </li>
+        </ol>
+      </div>
+
+      % if course_creator_status=='disallowed_for_this_site' and settings.FEATURES.get('STUDIO_REQUEST_EMAIL',''):
+      <div class="bit">
+        <h3 class="title title-3">${_("Can I create courses in {studio_name}?").format(studio_name=settings.STUDIO_NAME)}</h3>
+        <p>${Text(_("In order to create courses in {studio_name}, you must {link_start}contact {platform_name} staff to help you create a course{link_end}.")).format(
+            studio_name=settings.STUDIO_NAME,
+            platform_name=settings.PLATFORM_NAME,
+            link_start=HTML('<a href="mailto:{email}">').format(email=settings.FEATURES.get('STUDIO_REQUEST_EMAIL','')),
+            link_end=HTML("</a>"),
+          )}</p>
+      </div>
+      % endif
+
+      % if course_creator_status == "unrequested":
+      <div class="bit">
+        <h3 class="title title-3">${_("Can I create courses in {studio_name}?").format(studio_name=settings.STUDIO_NAME)}</h3>
+        <p>${_('In order to create courses in {studio_name}, you must have course creator privileges to create your own course.').format(studio_name=settings.STUDIO_NAME)}</p>
+      </div>
+
+      % elif course_creator_status == "denied":
+      <div class="bit">
+        <h3 class="title title-3">${_("Can I create courses in {studio_name}?").format(studio_name=settings.STUDIO_NAME)}</h3>
+        <p>${Text(_("Your request to author courses in {studio_name} has been denied. Please {link_start}contact {platform_name} Staff with further questions{link_end}.")).format(
+            studio_name=settings.STUDIO_NAME,
+            platform_name=settings.PLATFORM_NAME,
+            link_start=HTML('<a href="mailto:{email}">').format(email=settings.TECH_SUPPORT_EMAIL),
+            link_end=HTML('</a>'),
+          )}</p>
+      </div>
+
+      % endif
+    </aside>
+  </section>
+
+
+  % else:
+  <section class="content">
+    <article class="content-primary" role="main">
+      <div class="introduction">
+        <h2 class="title">${_("Thanks for signing up, {name}!").format(name=user.username)}</h2>
+      </div>
+
+      <div class="notice notice-incontext notice-instruction notice-instruction-verification">
+        <div class="msg">
+          <h3 class="title">${_("We need to verify your email address")}</h3>
+          <div class="copy">
+            <p>${_('Almost there! In order to complete your sign up we need you to verify your email address ({email}). An activation message and next steps should be waiting for you there.').format(email=user.email)}</p>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <aside class="content-supplementary" role="complementary">
+      <div class="bit">
+        <h3 class="title title-3">${_('Need help?')}</h3>
+        <p>${_('Please check your Junk or Spam folders in case our email isn\'t in your INBOX. Still can\'t find the verification email? Request help via the link below.')}</p>
+      </div>
+    </aside>
+  </section>
+
+  %endif
+</div>
+</%block>
